@@ -1,0 +1,24 @@
+{
+  "name": "tourmate",
+  "version": "1.0.0",
+  "description": "Tour management app for touring bands, crew, and production teams — itinerary/day sheets, travel (flights + lodging), guest lists, documents, and budgeting, with role-based access so managers see everything and crew only see what's relevant to them.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LakeaTrenae/TourMate.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/LakeaTrenae/TourMate/issues"
+  },
+  "homepage": "https://github.com/LakeaTrenae/TourMate#readme",
+  "devDependencies": {
+    "supabase": "^2.116.0"
+  }
+}

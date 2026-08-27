@@ -1,0 +1,9 @@
+# Root-level dependencies (the Supabase CLI devDependency) — mobile/ and
+# supabase/ each have their own .gitignore covering their own concerns.
+node_modules/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
