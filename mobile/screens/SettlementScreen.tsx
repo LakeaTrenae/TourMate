@@ -16,6 +16,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { parseOptionalNumber } from '../lib/numbers';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settlement'>;
@@ -72,29 +73,52 @@ export function SettlementScreen({ route }: Props) {
   // wins, since real settlements have adjustments a formula won't catch.
   function suggestNet(nextGuarantee: string, nextTicketCount: string, nextTicketPrice: string, nextExpenses: string) {
     if (netEdited) return;
+    // Only clear the field when every input is actually blank — a
+    // genuinely computed $0 (e.g. a comp show) should still show "0.00",
+    // not disappear, which `suggested ? ... : ''` would do since 0 is
+    // falsy in JS.
+    if (![nextGuarantee, nextTicketCount, nextTicketPrice, nextExpenses].some((v) => v.trim())) {
+      setNetToArtist('');
+      return;
+    }
     const g = Number.parseFloat(nextGuarantee) || 0;
     const tc = Number.parseInt(nextTicketCount, 10) || 0;
     const tp = Number.parseFloat(nextTicketPrice) || 0;
     const e = Number.parseFloat(nextExpenses) || 0;
-    const suggested = g + tc * tp - e;
-    setNetToArtist(suggested ? suggested.toFixed(2) : '');
+    setNetToArtist((g + tc * tp - e).toFixed(2));
   }
 
   async function handleSave() {
     if (!session) return;
     setErrorMessage(null);
-    setSaving(true);
 
-    const payload = {
-      guarantee: guarantee.trim() ? Number.parseFloat(guarantee) : null,
-      ticket_count: ticketCount.trim() ? Number.parseInt(ticketCount, 10) : null,
-      ticket_price: ticketPrice.trim() ? Number.parseFloat(ticketPrice) : null,
-      expenses: expenses.trim() ? Number.parseFloat(expenses) : null,
-      net_to_artist: netToArtist.trim() ? Number.parseFloat(netToArtist) : null,
-      notes: notes.trim() || null,
-      settled_by: session.user.id,
-      settled_at: new Date().toISOString(),
+    let payload: {
+      guarantee: number | null;
+      ticket_count: number | null;
+      ticket_price: number | null;
+      expenses: number | null;
+      net_to_artist: number | null;
+      notes: string | null;
+      settled_by: string;
+      settled_at: string;
     };
+    try {
+      payload = {
+        guarantee: parseOptionalNumber(guarantee, 'guarantee'),
+        ticket_count: parseOptionalNumber(ticketCount, 'ticket count', 'int'),
+        ticket_price: parseOptionalNumber(ticketPrice, 'ticket price'),
+        expenses: parseOptionalNumber(expenses, 'expenses'),
+        net_to_artist: parseOptionalNumber(netToArtist, 'net to artist'),
+        notes: notes.trim() || null,
+        settled_by: session.user.id,
+        settled_at: new Date().toISOString(),
+      };
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Invalid number.');
+      return;
+    }
+
+    setSaving(true);
 
     let error;
     if (settlementId) {

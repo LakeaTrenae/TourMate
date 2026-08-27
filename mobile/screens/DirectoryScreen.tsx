@@ -148,7 +148,7 @@ export function DirectoryScreen({ route, navigation }: Props) {
         autoCapitalize="none"
       />
 
-      {presentDepartments.length > 1 && (
+      {(presentDepartments.length > 1 || activeDepartment) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
           <Pressable
             style={[styles.chip, activeDepartment === null && styles.chipActive]}

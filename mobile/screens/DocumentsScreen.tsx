@@ -177,7 +177,7 @@ export function DocumentsScreen({ route, navigation }: Props) {
         )}
       </View>
 
-      {presentCategories.length > 1 && (
+      {(presentCategories.length > 1 || activeCategory) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chipRowContent}>
           <Pressable style={[styles.chip, activeCategory === null && styles.chipActive]} onPress={() => setActiveCategory(null)}>
             <Text style={[styles.chipText, activeCategory === null && styles.chipTextActive]}>All</Text>

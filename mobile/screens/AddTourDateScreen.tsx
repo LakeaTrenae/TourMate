@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { parseOptionalNumber } from '../lib/numbers';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddTourDate'>;
@@ -96,6 +97,18 @@ export function AddTourDateScreen({ route, navigation }: Props) {
       return;
     }
 
+    let parsedGuarantee: number | null;
+    let parsedTicketPrice: number | null;
+    let parsedCapacityOverride: number | null;
+    try {
+      parsedGuarantee = parseOptionalNumber(guarantee, 'guarantee');
+      parsedTicketPrice = parseOptionalNumber(ticketPrice, 'ticket price');
+      parsedCapacityOverride = parseOptionalNumber(capacityOverride, 'capacity override', 'int');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Invalid number.');
+      return;
+    }
+
     setSubmitting(true);
     const { error } = await supabase.from('tour_dates').insert({
       tour_id: tourId,
@@ -110,9 +123,9 @@ export function AddTourDateScreen({ route, navigation }: Props) {
       promoter_name: promoterName.trim() || null,
       promoter_phone: promoterPhone.trim() || null,
       promoter_email: promoterEmail.trim() || null,
-      guarantee: guarantee.trim() ? Number.parseFloat(guarantee) : null,
-      ticket_price: ticketPrice.trim() ? Number.parseFloat(ticketPrice) : null,
-      capacity_override: capacityOverride.trim() ? Number.parseInt(capacityOverride, 10) : null,
+      guarantee: parsedGuarantee,
+      ticket_price: parsedTicketPrice,
+      capacity_override: parsedCapacityOverride,
     });
     setSubmitting(false);
 

@@ -23,6 +23,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { geocodeAddress } from '../lib/geo';
 import { newId } from '../lib/ids';
+import { parseOptionalNumber } from '../lib/numbers';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddVenue'>;
@@ -199,6 +200,14 @@ export function AddVenueScreen({ route, navigation }: Props) {
       return;
     }
 
+    let parsedCapacity: number | null;
+    try {
+      parsedCapacity = parseOptionalNumber(capacity, 'capacity', 'int');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Invalid capacity.');
+      return;
+    }
+
     setSubmitting(true);
     const payload = {
       organization_id: organizationId,
@@ -207,7 +216,7 @@ export function AddVenueScreen({ route, navigation }: Props) {
       city: city.trim() || null,
       state: state.trim() || null,
       country: country.trim() || null,
-      capacity: capacity.trim() ? Number.parseInt(capacity, 10) : null,
+      capacity: parsedCapacity,
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
       geocoded_at: coords ? new Date().toISOString() : null,
