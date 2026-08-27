@@ -38,6 +38,7 @@ type Doc = {
   visibility: 'org' | 'managers_only';
   category: Category;
   created_at: string;
+  artist: { name: string } | null;
 };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
@@ -74,14 +75,14 @@ export function DocumentsScreen({ route, navigation }: Props) {
 
     const { data, error } = await supabase
       .from('documents')
-      .select('id, title, storage_path, visibility, category, created_at')
+      .select('id, title, storage_path, visibility, category, created_at, artist:artists(name)')
       .eq('tour_id', tourId)
       .order('created_at', { ascending: false });
     if (error) {
       setErrorMessage(error.message);
       return;
     }
-    setDocs(data ?? []);
+    setDocs((data ?? []) as unknown as Doc[]);
   }
 
   useFocusEffect(
@@ -215,6 +216,7 @@ export function DocumentsScreen({ route, navigation }: Props) {
                   {CATEGORY_LABELS[doc.category]} ·{' '}
                   {new Date(doc.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   {doc.visibility === 'managers_only' ? ' · Managers only' : ''}
+                  {doc.artist ? ` · ${doc.artist.name}` : ''}
                 </Text>
               </View>
               {openingId === doc.id ? <ActivityIndicator color="#fff" /> : <Text style={styles.openArrow}>›</Text>}

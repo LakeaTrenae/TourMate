@@ -45,6 +45,8 @@ import { AdvanceScreen } from './screens/AdvanceScreen';
 import { SettlementScreen } from './screens/SettlementScreen';
 import { RouteScreen } from './screens/RouteScreen';
 import { SeasonScreen } from './screens/SeasonScreen';
+import { ArtistsScreen } from './screens/ArtistsScreen';
+import { ArtistDetailScreen } from './screens/ArtistDetailScreen';
 import type { RootStackParamList } from './navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -121,6 +123,8 @@ function RootNavigator() {
           <Stack.Screen name="Settlement" component={SettlementScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Route" component={RouteScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Season" component={SeasonScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="Artists" component={ArtistsScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ArtistDetail" component={ArtistDetailScreen} options={{ headerShown: true, title: '' }} />
         </>
       )}
     </Stack.Navigator>

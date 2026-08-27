@@ -41,4 +41,6 @@ export type RootStackParamList = {
   Season: undefined;
   Route: { tourId: string; tourName: string };
   PassportVisa: { targetUserId?: string; targetName?: string };
+  Artists: { tourId: string; tourName: string };
+  ArtistDetail: { artistId: string; tourId: string; artistName: string };
 };

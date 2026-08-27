@@ -357,6 +357,7 @@ export function TourDashboardScreen({ route, navigation }: Props) {
 
       <Section title="More">
         <NavRow label="Directory" onPress={() => navigation.navigate('Directory', { tourId, tourName })} />
+        <NavRow label="Artists" onPress={() => navigation.navigate('Artists', { tourId, tourName })} />
         <NavRow label="Travel" onPress={() => navigation.navigate('Travel', { tourId, tourName })} />
         <NavRow label="Ground Transport" onPress={() => navigation.navigate('GroundTransport', { tourId, tourName })} />
         <NavRow label="Route" onPress={() => navigation.navigate('Route', { tourId, tourName })} />

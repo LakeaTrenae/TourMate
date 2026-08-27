@@ -9,7 +9,7 @@
 import { useCallback, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Print from 'expo-print';
 
 import { supabase } from '../lib/supabase';
@@ -17,6 +17,7 @@ import { useAuth } from '../lib/auth-context';
 import { formatDateOnly } from '../lib/dates';
 import { fetchForecast, weatherCodeLabel, type ForecastResult } from '../lib/geo';
 import { buildDaySheetHtml } from '../lib/dayPrint';
+import { newId } from '../lib/ids';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShowDetail'>;
@@ -49,6 +50,8 @@ type ShowDetail = {
 };
 
 type VenuePhoto = { id: string; url: string };
+type DressingRoom = { id: string; room_name: string; artist_id: string | null; notes: string | null; artist: { name: string } | null };
+type ArtistOption = { id: string; name: string };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 const STATUS_COLORS: Record<string, string> = {
@@ -64,18 +67,26 @@ export function ShowDetailScreen({ route, navigation }: Props) {
 
   const [show, setShow] = useState<ShowDetail | null>(null);
   const [isManager, setIsManager] = useState(false);
+  const [canManageRooms, setCanManageRooms] = useState(false);
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
   const [photos, setPhotos] = useState<VenuePhoto[]>([]);
+  const [dressingRooms, setDressingRooms] = useState<DressingRoom[]>([]);
+  const [artistOptions, setArtistOptions] = useState<ArtistOption[]>([]);
+  const [showAddRoom, setShowAddRoom] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [addingRoom, setAddingRoom] = useState(false);
+  const [assigningRoomId, setAssigningRoomId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function load() {
     if (session) {
-      const { data: roleData } = await supabase.rpc('effective_tour_role', {
-        p_tour_id: tourId,
-        p_user_id: session.user.id,
-      });
+      const [{ data: roleData }, { data: deptData }] = await Promise.all([
+        supabase.rpc('effective_tour_role', { p_tour_id: tourId, p_user_id: session.user.id }),
+        supabase.rpc('department_on_tour', { p_tour_id: tourId, p_user_id: session.user.id }),
+      ]);
       setIsManager(roleData ? MANAGER_TIERS.has(roleData) : false);
+      setCanManageRooms((roleData ? MANAGER_TIERS.has(roleData) : false) || deptData === 'production');
     }
 
     const { data, error } = await supabase
@@ -117,6 +128,66 @@ export function ShowDetailScreen({ route, navigation }: Props) {
     } else {
       setPhotos([]);
     }
+
+    // RLS already scopes this to what the current user can see — a crew
+    // member with no team assignment gets back only rooms assigned to an
+    // artist they're on the team for (or none at all), a manager gets
+    // everything (0027). No client-side filtering needed on top of that.
+    const { data: roomRows, error: roomError } = await supabase
+      .from('dressing_rooms')
+      .select('id, room_name, artist_id, notes, artist:artists(name)')
+      .eq('tour_date_id', tourDateId)
+      .order('room_name', { ascending: true });
+    if (roomError) setErrorMessage(roomError.message);
+    setDressingRooms((roomRows ?? []) as unknown as DressingRoom[]);
+
+    const { data: artistRows } = await supabase.from('artists').select('id, name').eq('tour_id', tourId).order('name', { ascending: true });
+    setArtistOptions(artistRows ?? []);
+  }
+
+  async function handleAddRoom() {
+    if (!newRoomName.trim()) return;
+    setErrorMessage(null);
+    setAddingRoom(true);
+    const { error } = await supabase.from('dressing_rooms').insert({
+      id: newId(),
+      tour_date_id: tourDateId,
+      room_name: newRoomName.trim(),
+    });
+    setAddingRoom(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setNewRoomName('');
+    setShowAddRoom(false);
+    await load();
+  }
+
+  async function handleAssignArtist(roomId: string, artistId: string | null) {
+    setErrorMessage(null);
+    const { error } = await supabase.from('dressing_rooms').update({ artist_id: artistId }).eq('id', roomId);
+    setAssigningRoomId(null);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    await load();
+  }
+
+  function confirmDeleteRoom(room: DressingRoom) {
+    Alert.alert('Remove this dressing room?', room.room_name, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.from('dressing_rooms').delete().eq('id', room.id);
+          if (error) setErrorMessage(error.message);
+          else await load();
+        },
+      },
+    ]);
   }
 
   useFocusEffect(
@@ -195,6 +266,70 @@ export function ShowDetailScreen({ route, navigation }: Props) {
         </View>
       ) : (
         <Text style={styles.emptyText}>No venue set for this date yet.</Text>
+      )}
+
+      {(dressingRooms.length > 0 || canManageRooms) && (
+        <View style={styles.card}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Dressing Rooms</Text>
+            {canManageRooms && (
+              <Pressable onPress={() => setShowAddRoom((v) => !v)}>
+                <Text style={styles.sectionAction}>{showAddRoom ? 'Cancel' : '+ Add'}</Text>
+              </Pressable>
+            )}
+          </View>
+          <Text style={styles.privacyNote}>
+            Visible only to tour management and each room's assigned artist team — that's the point.
+          </Text>
+
+          {showAddRoom && (
+            <View style={styles.addRoomRow}>
+              <TextInput
+                style={styles.addRoomInput}
+                placeholder="Room name (e.g. Room A)"
+                placeholderTextColor="#6b6b76"
+                value={newRoomName}
+                onChangeText={setNewRoomName}
+              />
+              <Pressable style={styles.addRoomButton} onPress={handleAddRoom} disabled={addingRoom || !newRoomName.trim()}>
+                {addingRoom ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.addRoomButtonText}>Add</Text>}
+              </Pressable>
+            </View>
+          )}
+
+          {dressingRooms.length === 0 ? (
+            <Text style={styles.emptyText}>No dressing rooms added yet.</Text>
+          ) : (
+            dressingRooms.map((room) => (
+              <View key={room.id} style={styles.roomRow}>
+                <Pressable
+                  style={styles.roomInfo}
+                  onLongPress={canManageRooms ? () => confirmDeleteRoom(room) : undefined}
+                >
+                  <Text style={styles.roomName}>{room.room_name}</Text>
+                  <Text style={styles.roomArtist}>{room.artist?.name ?? 'Unassigned'}</Text>
+                </Pressable>
+                {canManageRooms &&
+                  (assigningRoomId === room.id ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artistChipRow}>
+                      <Pressable style={styles.artistChip} onPress={() => handleAssignArtist(room.id, null)}>
+                        <Text style={styles.artistChipText}>None</Text>
+                      </Pressable>
+                      {artistOptions.map((a) => (
+                        <Pressable key={a.id} style={styles.artistChip} onPress={() => handleAssignArtist(room.id, a.id)}>
+                          <Text style={styles.artistChipText}>{a.name}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <Pressable onPress={() => setAssigningRoomId(room.id)}>
+                      <Text style={styles.sectionAction}>Assign</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            ))
+          )}
+        </View>
       )}
 
       <View style={styles.card}>
@@ -278,6 +413,36 @@ const styles = StyleSheet.create({
   photoRowContent: { gap: 8 },
   photoThumb: { width: 96, height: 96, borderRadius: 10, backgroundColor: '#0b0b0f' },
   sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  sectionAction: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
+  privacyNote: { color: '#6b6b76', fontSize: 11, marginBottom: 10, fontStyle: 'italic' },
+  addRoomRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  addRoomInput: {
+    flex: 1,
+    backgroundColor: '#0b0b0f',
+    color: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  addRoomButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
+  addRoomButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
+  roomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a32',
+    paddingTop: 10,
+    marginTop: 10,
+  },
+  roomInfo: { flex: 1 },
+  roomName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  roomArtist: { color: '#9a9aa5', fontSize: 12, marginTop: 2 },
+  artistChipRow: { flexGrow: 0, maxWidth: 220 },
+  artistChip: { backgroundColor: '#0b0b0f', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
+  artistChipText: { color: '#7c9cff', fontSize: 12, fontWeight: '600' },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   timeLabel: { color: '#6b6b76', fontSize: 13 },
   timeValue: { color: '#fff', fontSize: 13 },

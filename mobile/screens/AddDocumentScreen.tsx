@@ -10,7 +10,7 @@
  * If step 2 fails, the metadata row is cleaned up rather than left
  * dangling (a document entry with no file behind it).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -27,6 +27,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import type { RootStackParamList } from '../navigation/types';
+
+type ArtistOption = { id: string; name: string };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddDocument'>;
 
@@ -50,8 +52,19 @@ export function AddDocumentScreen({ route, navigation }: Props) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<Category>('general');
   const [visibility, setVisibility] = useState<'org' | 'managers_only'>('managers_only');
+  const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const [artistId, setArtistId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('artists')
+      .select('id, name')
+      .eq('tour_id', tourId)
+      .order('name', { ascending: true })
+      .then(({ data }) => setArtists(data ?? []));
+  }, [tourId]);
 
   async function handlePickFile() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
@@ -91,6 +104,7 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       storage_path: storagePath,
       visibility,
       category,
+      artist_id: artistId,
     });
     if (insertError) {
       setSubmitting(false);
@@ -141,6 +155,27 @@ export function AddDocumentScreen({ route, navigation }: Props) {
           </Pressable>
         ))}
       </View>
+
+      {artists.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Tag to an artist (optional)</Text>
+          <View style={styles.categoryRow}>
+            <Pressable style={[styles.categoryChip, artistId === null && styles.categoryChipActive]} onPress={() => setArtistId(null)}>
+              <Text style={[styles.categoryChipText, artistId === null && styles.categoryChipTextActive]}>None</Text>
+            </Pressable>
+            {artists.map((a) => (
+              <Pressable key={a.id} style={[styles.categoryChip, artistId === a.id && styles.categoryChipActive]} onPress={() => setArtistId(a.id)}>
+                <Text style={[styles.categoryChipText, artistId === a.id && styles.categoryChipTextActive]}>{a.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {artistId && (
+            <Text style={styles.artistTagHint}>
+              {artists.find((a) => a.id === artistId)?.name}'s team will be able to see this, regardless of the visibility setting below.
+            </Text>
+          )}
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>Who can see this</Text>
       <Pressable
@@ -198,6 +233,7 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: '#fff' },
   categoryChipText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
   categoryChipTextActive: { color: '#0b0b0f' },
+  artistTagHint: { color: '#6b6b76', fontSize: 12, marginTop: -2, marginBottom: 8 },
   visibilityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
