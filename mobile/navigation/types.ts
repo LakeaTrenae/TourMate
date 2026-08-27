@@ -43,4 +43,5 @@ export type RootStackParamList = {
   PassportVisa: { targetUserId?: string; targetName?: string };
   Artists: { tourId: string; tourName: string };
   ArtistDetail: { artistId: string; tourId: string; artistName: string };
+  DocumentSharing: { documentId: string; tourId: string; docTitle: string };
 };

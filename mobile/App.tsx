@@ -47,6 +47,7 @@ import { RouteScreen } from './screens/RouteScreen';
 import { SeasonScreen } from './screens/SeasonScreen';
 import { ArtistsScreen } from './screens/ArtistsScreen';
 import { ArtistDetailScreen } from './screens/ArtistDetailScreen';
+import { DocumentSharingScreen } from './screens/DocumentSharingScreen';
 import type { RootStackParamList } from './navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -125,6 +126,7 @@ function RootNavigator() {
           <Stack.Screen name="Season" component={SeasonScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Artists" component={ArtistsScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ArtistDetail" component={ArtistDetailScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="DocumentSharing" component={DocumentSharingScreen} options={{ headerShown: true, title: '' }} />
         </>
       )}
     </Stack.Navigator>

@@ -26,9 +26,14 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { fetchTourRoster, type RosterMember } from '../lib/roster';
+import { formatDepartment } from '../lib/format';
 import type { RootStackParamList } from '../navigation/types';
 
 type ArtistOption = { id: string; name: string };
+
+// Matches the tour_department enum (0003, extended with 'security' in 0021).
+const DEPARTMENTS = ['production', 'security', 'travel', 'artist_relations', 'finance', 'tour_management', 'general'];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddDocument'>;
 
@@ -51,7 +56,10 @@ export function AddDocumentScreen({ route, navigation }: Props) {
   const [file, setFile] = useState<PickedFile | null>(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<Category>('general');
-  const [visibility, setVisibility] = useState<'org' | 'managers_only'>('managers_only');
+  const [visibility, setVisibility] = useState<'org' | 'managers_only' | 'specific'>('managers_only');
+  const [roster, setRoster] = useState<RosterMember[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
   const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [artistId, setArtistId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +72,28 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       .eq('tour_id', tourId)
       .order('name', { ascending: true })
       .then(({ data }) => setArtists(data ?? []));
+    fetchTourRoster(tourId)
+      .then(setRoster)
+      .catch(() => {});
   }, [tourId]);
+
+  function toggleUser(userId: string) {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  function toggleDepartment(department: string) {
+    setSelectedDepartments((prev) => {
+      const next = new Set(prev);
+      if (next.has(department)) next.delete(department);
+      else next.add(department);
+      return next;
+    });
+  }
 
   async function handlePickFile() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
@@ -86,6 +115,10 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       setErrorMessage('Enter a title.');
       return;
     }
+    if (visibility === 'specific' && selectedUserIds.size === 0 && selectedDepartments.size === 0) {
+      setErrorMessage('Pick at least one person or department, or choose a different visibility option.');
+      return;
+    }
 
     setSubmitting(true);
 
@@ -96,13 +129,17 @@ export function AddDocumentScreen({ route, navigation }: Props) {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `${tourId}/${documentId}-${safeName}`;
 
+    // "Specific people or departments" is an exception list layered on
+    // top of the restrictive managers_only base (resource_shares, 0028)
+    // — not a third value stored on the row itself. Same model already
+    // used by schedule_items/checklists.
     const { error: insertError } = await supabase.from('documents').insert({
       id: documentId,
       tour_id: tourId,
       uploaded_by: session.user.id,
       title: title.trim(),
       storage_path: storagePath,
-      visibility,
+      visibility: visibility === 'specific' ? 'managers_only' : visibility,
       category,
       artist_id: artistId,
     });
@@ -110,6 +147,35 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       setSubmitting(false);
       setErrorMessage(insertError.message);
       return;
+    }
+
+    if (visibility === 'specific') {
+      const shareRows = [
+        ...Array.from(selectedUserIds).map((userId) => ({
+          tour_id: tourId,
+          resource_type: 'document',
+          resource_id: documentId,
+          shared_with_user_id: userId,
+          shared_with_department: null,
+          permission: 'view' as const,
+          granted_by: session.user.id,
+        })),
+        ...Array.from(selectedDepartments).map((department) => ({
+          tour_id: tourId,
+          resource_type: 'document',
+          resource_id: documentId,
+          shared_with_user_id: null,
+          shared_with_department: department,
+          permission: 'view' as const,
+          granted_by: session.user.id,
+        })),
+      ];
+      const { error: shareError } = await supabase.from('resource_shares').insert(shareRows);
+      if (shareError) {
+        setSubmitting(false);
+        setErrorMessage(`Document uploaded, but sharing failed: ${shareError.message}`);
+        return;
+      }
     }
 
     try {
@@ -192,6 +258,43 @@ export function AddDocumentScreen({ route, navigation }: Props) {
         <Text style={styles.visibilityText}>Everyone on the tour</Text>
         {visibility === 'org' && <Text style={styles.check}>✓</Text>}
       </Pressable>
+      <Pressable
+        style={[styles.visibilityRow, visibility === 'specific' && styles.visibilityRowSelected]}
+        onPress={() => setVisibility('specific')}
+      >
+        <Text style={styles.visibilityText}>Specific people or departments</Text>
+        {visibility === 'specific' && <Text style={styles.check}>✓</Text>}
+      </Pressable>
+
+      {visibility === 'specific' && (
+        <View style={styles.shareBox}>
+          <Text style={styles.shareBoxLabel}>Departments</Text>
+          {DEPARTMENTS.map((d) => {
+            const checked = selectedDepartments.has(d);
+            return (
+              <Pressable key={d} style={styles.checkboxRow} onPress={() => toggleDepartment(d)}>
+                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
+                <Text style={styles.checkboxLabel}>{formatDepartment(d)}</Text>
+              </Pressable>
+            );
+          })}
+
+          {roster.length > 0 && (
+            <>
+              <Text style={[styles.shareBoxLabel, styles.shareBoxLabelSpaced]}>People</Text>
+              {roster.map((member) => {
+                const checked = selectedUserIds.has(member.user_id);
+                return (
+                  <Pressable key={member.user_id} style={styles.checkboxRow} onPress={() => toggleUser(member.user_id)}>
+                    <View style={[styles.checkbox, checked && styles.checkboxChecked]}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
+                    <Text style={styles.checkboxLabel}>{member.display_name}</Text>
+                  </Pressable>
+                );
+              })}
+            </>
+          )}
+        </View>
+      )}
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
@@ -246,6 +349,23 @@ const styles = StyleSheet.create({
   visibilityRowSelected: { backgroundColor: '#2a2a3a' },
   visibilityText: { color: '#fff', fontSize: 14 },
   check: { color: '#7c9cff', fontSize: 14, fontWeight: '700' },
+  shareBox: { backgroundColor: '#15151a', borderRadius: 10, padding: 14, marginBottom: 6 },
+  shareBoxLabel: { color: '#9a9aa5', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
+  shareBoxLabelSpaced: { marginTop: 14 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#6b6b76',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  checkboxChecked: { backgroundColor: '#7c9cff', borderColor: '#7c9cff' },
+  checkmark: { color: '#0b0b0f', fontSize: 12, fontWeight: '700' },
+  checkboxLabel: { color: '#fff', fontSize: 14 },
   error: { color: '#ff6b6b', fontSize: 13, marginTop: 8 },
   submitButton: {
     backgroundColor: '#fff',

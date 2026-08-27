@@ -210,7 +210,7 @@ export function DocumentsScreen({ route, navigation }: Props) {
               onLongPress={isManager ? () => confirmDelete(doc) : undefined}
               disabled={openingId === doc.id}
             >
-              <View>
+              <View style={styles.docInfo}>
                 <Text style={styles.docTitle}>{doc.title}</Text>
                 <Text style={styles.docMeta}>
                   {CATEGORY_LABELS[doc.category]} ·{' '}
@@ -218,6 +218,13 @@ export function DocumentsScreen({ route, navigation }: Props) {
                   {doc.visibility === 'managers_only' ? ' · Managers only' : ''}
                   {doc.artist ? ` · ${doc.artist.name}` : ''}
                 </Text>
+                {isManager && (
+                  <Pressable
+                    onPress={() => navigation.navigate('DocumentSharing', { documentId: doc.id, tourId, docTitle: doc.title })}
+                  >
+                    <Text style={styles.shareLink}>Share ›</Text>
+                  </Pressable>
+                )}
               </View>
               {openingId === doc.id ? <ActivityIndicator color="#fff" /> : <Text style={styles.openArrow}>›</Text>}
             </Pressable>
@@ -256,7 +263,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   docTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  docInfo: { flex: 1 },
   docMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
+  shareLink: { color: '#7c9cff', fontSize: 12, fontWeight: '600', marginTop: 6 },
   openArrow: { color: '#6b6b76', fontSize: 18 },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });
