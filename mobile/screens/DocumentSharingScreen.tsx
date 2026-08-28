@@ -19,6 +19,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { formatDepartment } from '../lib/format';
+import { logAuditEvent } from '../lib/auditLog';
+import { notify } from '../lib/notify';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DocumentSharing'>;
@@ -65,6 +67,7 @@ export function DocumentSharingScreen({ route }: Props) {
     if (existing) {
       const { error } = await supabase.from('resource_shares').delete().eq('id', existing.id);
       if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'unshare', resourceType: 'resource_share', resourceId: documentId, detail: { resource_type: 'document', shared_with_user_id: userId } });
     } else {
       const { error } = await supabase.from('resource_shares').insert({
         tour_id: tourId,
@@ -75,6 +78,8 @@ export function DocumentSharingScreen({ route }: Props) {
         granted_by: session.user.id,
       });
       if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'share', resourceType: 'resource_share', resourceId: documentId, detail: { resource_type: 'document', shared_with_user_id: userId } });
+      notify({ tourId, targetUserIds: [userId], title: 'Document shared with you', body: docTitle, data: { type: 'document_share', documentId } });
     }
     await load();
   }
@@ -86,6 +91,7 @@ export function DocumentSharingScreen({ route }: Props) {
     if (existing) {
       const { error } = await supabase.from('resource_shares').delete().eq('id', existing.id);
       if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'unshare', resourceType: 'resource_share', resourceId: documentId, detail: { resource_type: 'document', shared_with_department: department } });
     } else {
       const { error } = await supabase.from('resource_shares').insert({
         tour_id: tourId,
@@ -96,6 +102,9 @@ export function DocumentSharingScreen({ route }: Props) {
         granted_by: session.user.id,
       });
       if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'share', resourceType: 'resource_share', resourceId: documentId, detail: { resource_type: 'document', shared_with_department: department } });
+      const targets = roster.filter((r) => r.department === department).map((r) => r.user_id);
+      notify({ tourId, targetUserIds: targets, title: 'Document shared with you', body: docTitle, data: { type: 'document_share', documentId } });
     }
     await load();
   }

@@ -15,7 +15,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -25,6 +24,8 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth-context';
+import { logAuditEvent } from '../lib/auditLog';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Budget'>;
@@ -41,11 +42,12 @@ type BudgetItem = {
 
 export function BudgetScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
+  const { session } = useAuth();
 
   const [items, setItems] = useState<BudgetItem[]>([]);
+  const [settlementsTotal, setSettlementsTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [openingReceiptId, setOpeningReceiptId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function load() {
@@ -59,6 +61,29 @@ export function BudgetScreen({ route, navigation }: Props) {
       return;
     }
     setItems(data ?? []);
+
+    // settlements has no direct tour_id column — it's per tour_date, so
+    // resolving "this tour's settlements" is a two-step lookup, same
+    // pattern GuestListScreen already uses for tour_date-scoped data.
+    const { data: dateRows, error: dateError } = await supabase.from('tour_dates').select('id').eq('tour_id', tourId);
+    if (dateError) {
+      setSettlementsTotal(null);
+      return;
+    }
+    const dateIds = (dateRows ?? []).map((d) => d.id);
+    if (dateIds.length === 0) {
+      setSettlementsTotal(0);
+      return;
+    }
+    const { data: settlementRows, error: settlementError } = await supabase
+      .from('settlements')
+      .select('net_to_artist')
+      .in('tour_date_id', dateIds);
+    if (settlementError) {
+      setSettlementsTotal(null);
+      return;
+    }
+    setSettlementsTotal((settlementRows ?? []).reduce((sum, s) => sum + Number(s.net_to_artist ?? 0), 0));
   }
 
   useFocusEffect(
@@ -83,25 +108,29 @@ export function BudgetScreen({ route, navigation }: Props) {
         style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.from('budget_items').delete().eq('id', item.id);
-          if (error) setErrorMessage(error.message);
-          else await load();
+          if (error) {
+            setErrorMessage(error.message);
+            return;
+          }
+          if (session) {
+            logAuditEvent({
+              tourId,
+              actorId: session.user.id,
+              action: 'delete',
+              resourceType: 'budget_item',
+              resourceId: item.id,
+              detail: { category: item.category, amount: item.amount },
+            });
+          }
+          await load();
         },
       },
     ]);
   }
 
-  async function openReceipt(item: BudgetItem) {
+  function openReceipt(item: BudgetItem) {
     if (!item.receipt_path) return;
-    setOpeningReceiptId(item.id);
-    // Signed URL, not a permanent public link — the bucket is private and
-    // this expires in 5 minutes, same reasoning as document viewing.
-    const { data, error } = await supabase.storage.from('tour-receipts').createSignedUrl(item.receipt_path, 60 * 5);
-    setOpeningReceiptId(null);
-    if (error || !data) {
-      setErrorMessage(error?.message ?? 'Failed to open receipt.');
-      return;
-    }
-    Linking.openURL(data.signedUrl);
+    navigation.navigate('ViewDocument', { bucket: 'tour-receipts', storagePath: item.receipt_path, title: `${item.category} receipt` });
   }
 
   const totals = useMemo(() => {
@@ -151,6 +180,15 @@ export function BudgetScreen({ route, navigation }: Props) {
         </View>
       </View>
 
+      {settlementsTotal !== null && settlementsTotal !== 0 && (
+        <View style={styles.settlementsCard}>
+          <Text style={styles.settlementsLabel}>Settlements (separate from the manual entries below)</Text>
+          <Text style={[styles.settlementsValue, { color: settlementsTotal >= 0 ? '#7ee787' : '#ff6b6b' }]}>
+            {formatCurrency(settlementsTotal)} net to artist
+          </Text>
+        </View>
+      )}
+
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
@@ -171,18 +209,21 @@ export function BudgetScreen({ route, navigation }: Props) {
               <View>
                 <Text style={styles.category}>{item.category}</Text>
                 {item.description && <Text style={styles.description}>{item.description}</Text>}
-                {item.receipt_path && (
-                  <Text style={styles.receiptLink}>{openingReceiptId === item.id ? 'Opening…' : '📎 Receipt'}</Text>
-                )}
+                {item.receipt_path && <Text style={styles.receiptLink}>📎 Receipt</Text>}
               </View>
-              <Text style={[styles.amount, { color: item.entry_type === 'income' ? '#7ee787' : '#ff6b6b' }]}>
-                {item.entry_type === 'income' ? '+' : '−'}
-                {formatCurrency(Math.abs(item.amount))}
-              </Text>
+              <View style={styles.cardActions}>
+                <Text style={[styles.amount, { color: item.entry_type === 'income' ? '#7ee787' : '#ff6b6b' }]}>
+                  {item.entry_type === 'income' ? '+' : '−'}
+                  {formatCurrency(Math.abs(item.amount))}
+                </Text>
+                <Pressable style={styles.deleteButton} onPress={() => confirmDelete(item)}>
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </Pressable>
+              </View>
             </Pressable>
           ))
         )}
-        {items.length > 0 && <Text style={styles.hint}>Tap an entry with a receipt to view it. Hold any entry to delete it.</Text>}
+        {items.length > 0 && <Text style={styles.hint}>Tap an entry with a receipt to view it. Tap Delete (or hold an entry) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -206,6 +247,16 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryLabel: { color: '#6b6b76', fontSize: 11, textTransform: 'uppercase' },
   summaryValue: { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  settlementsCard: {
+    backgroundColor: '#15151a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2a2a32',
+    padding: 12,
+    marginBottom: 16,
+  },
+  settlementsLabel: { color: '#6b6b76', fontSize: 11, textTransform: 'uppercase' },
+  settlementsValue: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
@@ -221,6 +272,9 @@ const styles = StyleSheet.create({
   category: { color: '#fff', fontSize: 14, fontWeight: '600' },
   description: { color: '#6b6b76', fontSize: 12, marginTop: 2 },
   receiptLink: { color: '#7c9cff', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  cardActions: { alignItems: 'flex-end', gap: 6 },
   amount: { fontSize: 15, fontWeight: '700' },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 11, fontWeight: '600' },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });

@@ -28,14 +28,18 @@ const STATUSES: { value: Status; label: string }[] = [
   { value: 'confirmed', label: 'Confirmed' },
 ];
 const DEPARTMENTS = ['tour_management', 'production', 'security', 'travel', 'artist_relations', 'finance', 'general'];
+// Same base concept as AddChecklistScreen: visible_to_all only stores
+// true/false, so 'specific' is a UI-level distinction, not a stored
+// value — detected here by whether any resource_shares rows exist yet.
+type Visibility = 'department' | 'org' | 'specific';
 
-export function AdvanceScreen({ route }: Props) {
-  const { tourDateId, tourDateLabel } = route.params;
+export function AdvanceScreen({ route, navigation }: Props) {
+  const { tourId, tourDateId, tourDateLabel } = route.params;
   const { session } = useAuth();
 
   const [advanceId, setAdvanceId] = useState<string | null>(null);
   const [department, setDepartment] = useState('production');
-  const [visibleToAll, setVisibleToAll] = useState(true);
+  const [visibility, setVisibility] = useState<Visibility>('org');
   const [status, setStatus] = useState<Status>('not_started');
   const [powerNotes, setPowerNotes] = useState('');
   const [hospitalityNotes, setHospitalityNotes] = useState('');
@@ -61,7 +65,6 @@ export function AdvanceScreen({ route }: Props) {
     if (data) {
       setAdvanceId(data.id);
       setDepartment(data.department);
-      setVisibleToAll(data.visible_to_all);
       setStatus(data.status);
       setPowerNotes(data.power_notes ?? '');
       setHospitalityNotes(data.hospitality_notes ?? '');
@@ -69,6 +72,17 @@ export function AdvanceScreen({ route }: Props) {
       setParkingNotes(data.parking_notes ?? '');
       setSecurityNotes(data.security_notes ?? '');
       setOtherNotes(data.other_notes ?? '');
+
+      if (data.visible_to_all) {
+        setVisibility('org');
+      } else {
+        const { count } = await supabase
+          .from('resource_shares')
+          .select('id', { count: 'exact', head: true })
+          .eq('resource_type', 'advance')
+          .eq('resource_id', data.id);
+        setVisibility(count && count > 0 ? 'specific' : 'department');
+      }
     }
   }
 
@@ -87,7 +101,7 @@ export function AdvanceScreen({ route }: Props) {
 
     const payload = {
       department,
-      visible_to_all: visibleToAll,
+      visible_to_all: visibility === 'org',
       status,
       power_notes: powerNotes.trim() || null,
       hospitality_notes: hospitalityNotes.trim() || null,
@@ -151,14 +165,38 @@ export function AdvanceScreen({ route }: Props) {
       </View>
 
       <Text style={styles.sectionTitle}>Who can see it</Text>
-      <View style={styles.chipRow}>
-        <Pressable style={[styles.chip, visibleToAll && styles.chipActive]} onPress={() => setVisibleToAll(true)}>
-          <Text style={[styles.chipText, visibleToAll && styles.chipTextActive]}>Everyone on the tour</Text>
-        </Pressable>
-        <Pressable style={[styles.chip, !visibleToAll && styles.chipActive]} onPress={() => setVisibleToAll(false)}>
-          <Text style={[styles.chipText, !visibleToAll && styles.chipTextActive]}>Managers + this department</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        style={[styles.visibilityRow, visibility === 'department' && styles.visibilityRowSelected]}
+        onPress={() => setVisibility('department')}
+      >
+        <Text style={styles.visibilityText}>Managers + this department</Text>
+        {visibility === 'department' && <Text style={styles.check}>✓</Text>}
+      </Pressable>
+      <Pressable
+        style={[styles.visibilityRow, visibility === 'org' && styles.visibilityRowSelected]}
+        onPress={() => setVisibility('org')}
+      >
+        <Text style={styles.visibilityText}>Everyone on the tour</Text>
+        {visibility === 'org' && <Text style={styles.check}>✓</Text>}
+      </Pressable>
+      <Pressable
+        style={[styles.visibilityRow, visibility === 'specific' && styles.visibilityRowSelected]}
+        onPress={() => setVisibility('specific')}
+      >
+        <Text style={styles.visibilityText}>Specific people or departments</Text>
+        {visibility === 'specific' && <Text style={styles.check}>✓</Text>}
+      </Pressable>
+      {visibility === 'specific' &&
+        (advanceId ? (
+          <Pressable
+            style={styles.shareLinkButton}
+            onPress={() => navigation.navigate('AdvanceSharing', { advanceId, tourId, advanceLabel: `Advance — ${tourDateLabel}` })}
+          >
+            <Text style={styles.shareLinkButtonText}>Choose specific people or departments ›</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.visibilityHint}>Save once first, then come back here to pick specific people or departments.</Text>
+        ))}
 
       <Section label="Power" value={powerNotes} onChange={setPowerNotes} />
       <Section label="Hospitality" value={hospitalityNotes} onChange={setHospitalityNotes} />
@@ -203,6 +241,21 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#fff' },
   chipText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: '#0b0b0f' },
+  visibilityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a20',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 6,
+  },
+  visibilityRowSelected: { backgroundColor: '#2a2a3a' },
+  visibilityText: { color: '#fff', fontSize: 14 },
+  check: { color: '#7c9cff', fontSize: 14, fontWeight: '700' },
+  visibilityHint: { color: '#6b6b76', fontSize: 12, marginTop: -2, marginBottom: 8, fontStyle: 'italic' },
+  shareLinkButton: { paddingVertical: 6, marginBottom: 8 },
+  shareLinkButtonText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
   section: { marginTop: 4 },
   textArea: {
     backgroundColor: '#1a1a20',

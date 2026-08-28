@@ -185,10 +185,13 @@ export function ChecklistDetailScreen({ route }: Props) {
               {item.is_checked && <Text style={styles.checkmark}>✓</Text>}
             </View>
             <Text style={[styles.itemText, item.is_checked && styles.itemTextChecked]}>{item.description}</Text>
+            <Pressable style={styles.deleteButton} onPress={() => confirmDeleteItem(item)}>
+              <Text style={styles.deleteButtonText}>✕</Text>
+            </Pressable>
           </Pressable>
         ))
       )}
-      {items.length > 0 && <Text style={styles.hint}>Tap to check off · hold to remove.</Text>}
+      {items.length > 0 && <Text style={styles.hint}>Tap to check off · tap ✕ (or hold) to remove.</Text>}
 
       <View style={styles.addItemRow}>
         <TextInput
@@ -255,6 +258,8 @@ const styles = StyleSheet.create({
   checkmark: { color: '#0b0b0f', fontSize: 14, fontWeight: '700' },
   itemText: { color: '#fff', fontSize: 14, flex: 1 },
   itemTextChecked: { color: '#6b6b76', textDecorationLine: 'line-through' },
+  deleteButton: { paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 16, fontWeight: '700' },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
   addItemRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   addItemInput: {

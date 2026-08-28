@@ -17,12 +17,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import { parseOptionalNumber } from '../lib/numbers';
+import { logAuditEvent } from '../lib/auditLog';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settlement'>;
 
 export function SettlementScreen({ route }: Props) {
-  const { tourDateId, tourDateLabel } = route.params;
+  const { tourId, tourDateId, tourDateLabel } = route.params;
   const { session } = useAuth();
 
   const [settlementId, setSettlementId] = useState<string | null>(null);
@@ -120,22 +121,35 @@ export function SettlementScreen({ route }: Props) {
 
     setSaving(true);
 
+    const wasExisting = !!settlementId;
+    const savedId = settlementId ?? newId();
     let error;
     if (settlementId) {
       ({ error } = await supabase.from('settlements').update(payload).eq('id', settlementId));
     } else {
-      const newSettlementId = newId();
       ({ error } = await supabase.from('settlements').insert({
-        id: newSettlementId,
+        id: savedId,
         tour_date_id: tourDateId,
         created_by: session.user.id,
         ...payload,
       }));
-      if (!error) setSettlementId(newSettlementId);
+      if (!error) setSettlementId(savedId);
     }
 
     setSaving(false);
-    if (error) setErrorMessage(error.message);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    logAuditEvent({
+      tourId,
+      actorId: session.user.id,
+      action: wasExisting ? 'update' : 'create',
+      resourceType: 'settlement',
+      resourceId: savedId,
+      detail: { tour_date_id: tourDateId, net_to_artist: payload.net_to_artist },
+    });
   }
 
   if (loading) {

@@ -157,11 +157,18 @@ export function ArtistsScreen({ route, navigation }: Props) {
               onLongPress={canManage ? () => confirmDelete(artist) : undefined}
             >
               <Text style={styles.artistName}>{artist.name}</Text>
-              <Text style={styles.openArrow}>›</Text>
+              <View style={styles.cardActions}>
+                {canManage && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(artist)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </Pressable>
+                )}
+                <Text style={styles.openArrow}>›</Text>
+              </View>
             </Pressable>
           ))
         )}
-        {canManage && artists.length > 0 && <Text style={styles.hint}>Hold an artist to remove them.</Text>}
+        {canManage && artists.length > 0 && <Text style={styles.hint}>Tap Delete (or hold an artist) to remove them.</Text>}
       </ScrollView>
     </View>
   );
@@ -199,5 +206,8 @@ const styles = StyleSheet.create({
   },
   artistName: { color: '#fff', fontSize: 16, fontWeight: '600' },
   openArrow: { color: '#6b6b76', fontSize: 18 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });

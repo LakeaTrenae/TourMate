@@ -137,7 +137,12 @@ export function VenuesScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('AddVenue', { organizationId, venueId: venue.id })}
               onLongPress={() => confirmDelete(venue)}
             >
-              <Text style={styles.venueName}>{venue.name}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={styles.venueName}>{venue.name}</Text>
+                <Pressable style={styles.deleteButton} onPress={() => confirmDelete(venue)}>
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </Pressable>
+              </View>
               <Text style={styles.venueMeta}>
                 {[venue.city, venue.state].filter(Boolean).join(', ') || 'No city set'}
                 {venue.capacity ? ` · Cap. ${venue.capacity.toLocaleString()}` : ''}
@@ -146,7 +151,7 @@ export function VenuesScreen({ route, navigation }: Props) {
             </Pressable>
           ))
         )}
-        {filtered.length > 0 && <Text style={styles.hint}>Tap to edit · hold to delete.</Text>}
+        {filtered.length > 0 && <Text style={styles.hint}>Tap to edit · tap Delete (or hold) to remove.</Text>}
       </ScrollView>
     </View>
   );
@@ -173,7 +178,10 @@ const styles = StyleSheet.create({
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
   card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   venueName: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   venueMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
   notGeocoded: { color: '#e8c274', fontSize: 11, marginTop: 6 },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },

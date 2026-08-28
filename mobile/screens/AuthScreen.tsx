@@ -14,6 +14,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -23,6 +24,7 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../lib/auth-context';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot';
 
@@ -167,6 +169,20 @@ export function AuthScreen() {
               </Text>
             )}
           </Pressable>
+
+          {isSignUp && (
+            <Text style={styles.agreementText}>
+              By creating an account you agree to our{' '}
+              <Text style={styles.agreementLink} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
+                Terms of Service
+              </Text>{' '}
+              and{' '}
+              <Text style={styles.agreementLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          )}
         </>
       )}
 
@@ -252,6 +268,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     marginTop: 4,
+  },
+  agreementText: {
+    color: '#6b6b76',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: -12,
+    marginBottom: 16,
+    lineHeight: 17,
+  },
+  agreementLink: {
+    color: '#7c9cff',
   },
   toggleTextSecondary: {
     color: '#6b6b76',

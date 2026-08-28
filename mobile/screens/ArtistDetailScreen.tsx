@@ -32,6 +32,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { newId } from '../lib/ids';
+import { logAuditEvent } from '../lib/auditLog';
+import { notify } from '../lib/notify';
+import { formatDateOnly } from '../lib/dates';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArtistDetail'>;
@@ -39,6 +42,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ArtistDetail'>;
 type Contact = { id: string; name: string; role: string | null; phone: string | null; email: string | null };
 type TeamMember = { id: string; user_id: string; role: string | null; profile: { display_name: string } | null };
 type Doc = { id: string; title: string; category: string; created_at: string };
+type DressingRoom = { id: string; room_name: string; notes: string | null; tour_date: { date: string } | null };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 
@@ -50,6 +54,7 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [dressingRooms, setDressingRooms] = useState<DressingRoom[]>([]);
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [showAddContact, setShowAddContact] = useState(false);
   const [contactName, setContactName] = useState('');
@@ -71,7 +76,7 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       setCanManage((roleData ? MANAGER_TIERS.has(roleData) : false) || deptData === 'production');
     }
 
-    const [contactsRes, teamRes, docsRes, rosterList] = await Promise.all([
+    const [contactsRes, teamRes, docsRes, roomsRes, rosterList] = await Promise.all([
       supabase.from('artist_contacts').select('id, name, role, phone, email').eq('artist_id', artistId),
       // artist_team_members has two FKs into profiles (user_id and
       // added_by) — PostgREST can't auto-pick which one to embed for
@@ -79,6 +84,11 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       // explicitly rather than just `profiles(display_name)`.
       supabase.from('artist_team_members').select('id, user_id, role, profile:profiles!artist_team_members_user_id_fkey(display_name)').eq('artist_id', artistId),
       supabase.from('documents').select('id, title, category, created_at').eq('artist_id', artistId).order('created_at', { ascending: false }),
+      // Read-only here — assignment itself is inherently date-scoped and
+      // stays on ShowDetailScreen; this just answers "where is this
+      // artist set up, date by date." RLS (0027) already limits what
+      // comes back to what this viewer is allowed to see.
+      supabase.from('dressing_rooms').select('id, room_name, notes, tour_date:tour_dates(date)').eq('artist_id', artistId),
       fetchTourRoster(tourId).catch(() => [] as RosterMember[]),
     ]);
 
@@ -88,6 +98,13 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
     setTeam((teamRes.data ?? []) as unknown as TeamMember[]);
     if (docsRes.error) setErrorMessage(docsRes.error.message);
     setDocs(docsRes.data ?? []);
+    if (roomsRes.error) setErrorMessage(roomsRes.error.message);
+    const rooms = ((roomsRes.data ?? []) as unknown as DressingRoom[]).slice().sort((a, b) => {
+      const da = a.tour_date?.date ?? '';
+      const db = b.tour_date?.date ?? '';
+      return da.localeCompare(db);
+    });
+    setDressingRooms(rooms);
     setRoster(rosterList);
   }
 
@@ -106,11 +123,12 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
   }
 
   async function handleAddContact() {
-    if (!contactName.trim()) return;
+    if (!contactName.trim() || !session) return;
     setSavingContact(true);
     setErrorMessage(null);
+    const contactId = newId();
     const { error } = await supabase.from('artist_contacts').insert({
-      id: newId(),
+      id: contactId,
       artist_id: artistId,
       name: contactName.trim(),
       role: contactRole.trim() || null,
@@ -122,6 +140,14 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       setErrorMessage(error.message);
       return;
     }
+    logAuditEvent({
+      tourId,
+      actorId: session.user.id,
+      action: 'create',
+      resourceType: 'artist_contact',
+      resourceId: contactId,
+      detail: { artist_id: artistId, name: contactName.trim() },
+    });
     setContactName('');
     setContactRole('');
     setContactPhone('');
@@ -138,8 +164,21 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
         style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.from('artist_contacts').delete().eq('id', contact.id);
-          if (error) setErrorMessage(error.message);
-          else await load();
+          if (error) {
+            setErrorMessage(error.message);
+            return;
+          }
+          if (session) {
+            logAuditEvent({
+              tourId,
+              actorId: session.user.id,
+              action: 'delete',
+              resourceType: 'artist_contact',
+              resourceId: contact.id,
+              detail: { artist_id: artistId, name: contact.name },
+            });
+          }
+          await load();
         },
       },
     ]);
@@ -156,6 +195,13 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       setErrorMessage(error.message.includes('duplicate') ? 'Already on this team.' : error.message);
       return;
     }
+    notify({
+      tourId,
+      targetUserIds: [userId],
+      title: artistName,
+      body: `You've been added to ${artistName}'s team.`,
+      data: { type: 'artist_team_add', artistId },
+    });
     setShowAddTeam(false);
     await load();
   }
@@ -219,17 +265,24 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       )}
       {contacts.length === 0 && !showAddContact && <Text style={styles.emptyText}>No contacts on file.</Text>}
       {contacts.map((c) => (
-        <Pressable key={c.id} style={styles.card} onLongPress={canManage ? () => confirmDeleteContact(c) : undefined}>
-          <Text style={styles.contactName}>{c.name}</Text>
-          {c.role && <Text style={styles.contactRole}>{c.role}</Text>}
-          {c.phone && (
-            <Pressable onPress={() => Linking.openURL(`tel:${c.phone}`)}>
-              <Text style={styles.contactLink}>{c.phone}</Text>
-            </Pressable>
-          )}
-          {c.email && (
-            <Pressable onPress={() => Linking.openURL(`mailto:${c.email}`)}>
-              <Text style={styles.contactLink}>{c.email}</Text>
+        <Pressable key={c.id} style={[styles.card, styles.cardRow]} onLongPress={canManage ? () => confirmDeleteContact(c) : undefined}>
+          <View style={styles.cardMain}>
+            <Text style={styles.contactName}>{c.name}</Text>
+            {c.role && <Text style={styles.contactRole}>{c.role}</Text>}
+            {c.phone && (
+              <Pressable onPress={() => Linking.openURL(`tel:${c.phone}`)}>
+                <Text style={styles.contactLink}>{c.phone}</Text>
+              </Pressable>
+            )}
+            {c.email && (
+              <Pressable onPress={() => Linking.openURL(`mailto:${c.email}`)}>
+                <Text style={styles.contactLink}>{c.email}</Text>
+              </Pressable>
+            )}
+          </View>
+          {canManage && (
+            <Pressable style={styles.deleteButton} onPress={() => confirmDeleteContact(c)}>
+              <Text style={styles.deleteButtonText}>Delete</Text>
             </Pressable>
           )}
         </Pressable>
@@ -259,12 +312,35 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       )}
       {team.length === 0 && !showAddTeam && <Text style={styles.emptyText}>No one assigned yet.</Text>}
       {team.map((m) => (
-        <Pressable key={m.id} style={styles.card} onLongPress={canManage ? () => confirmRemoveTeamMember(m) : undefined}>
-          <Text style={styles.contactName}>{m.profile?.display_name ?? 'Unknown'}</Text>
-          {m.role && <Text style={styles.contactRole}>{m.role}</Text>}
+        <Pressable key={m.id} style={[styles.card, styles.cardRow]} onLongPress={canManage ? () => confirmRemoveTeamMember(m) : undefined}>
+          <View style={styles.cardMain}>
+            <Text style={styles.contactName}>{m.profile?.display_name ?? 'Unknown'}</Text>
+            {m.role && <Text style={styles.contactRole}>{m.role}</Text>}
+          </View>
+          {canManage && (
+            <Pressable style={styles.deleteButton} onPress={() => confirmRemoveTeamMember(m)}>
+              <Text style={styles.deleteButtonText}>Remove</Text>
+            </Pressable>
+          )}
         </Pressable>
       ))}
-      {canManage && team.length > 0 && <Text style={styles.hint}>Hold a name to remove them from this team.</Text>}
+      {canManage && team.length > 0 && <Text style={styles.hint}>Tap Remove (or hold a name) to remove them from this team.</Text>}
+
+      <View style={[styles.sectionHeader, styles.sectionSpaced]}>
+        <Text style={styles.sectionTitle}>Dressing Rooms</Text>
+      </View>
+      {dressingRooms.length === 0 ? (
+        <Text style={styles.emptyText}>No dressing rooms assigned yet.</Text>
+      ) : (
+        dressingRooms.map((r) => (
+          <View key={r.id} style={styles.card}>
+            <Text style={styles.contactName}>{r.room_name}</Text>
+            <Text style={styles.contactRole}>{r.tour_date ? formatDateOnly(r.tour_date.date, { weekday: 'short', month: 'short', day: 'numeric' }) : 'No date'}</Text>
+            {r.notes && <Text style={styles.contactRole}>{r.notes}</Text>}
+          </View>
+        ))
+      )}
+      <Text style={styles.hint}>Assign or reassign a room from that date's show detail screen.</Text>
 
       <View style={[styles.sectionHeader, styles.sectionSpaced]}>
         <Text style={styles.sectionTitle}>Riders & Hospitality</Text>
@@ -312,6 +388,10 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
   saveButtonText: { color: '#0b0b0f', fontSize: 14, fontWeight: '600' },
   card: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14, marginBottom: 8 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardMain: { flex: 1 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   contactName: { color: '#fff', fontSize: 14, fontWeight: '600' },
   contactRole: { color: '#9a9aa5', fontSize: 12, marginTop: 2 },
   contactLink: { color: '#7c9cff', fontSize: 13, marginTop: 4 },

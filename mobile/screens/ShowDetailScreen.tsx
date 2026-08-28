@@ -72,6 +72,7 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   const [photos, setPhotos] = useState<VenuePhoto[]>([]);
   const [dressingRooms, setDressingRooms] = useState<DressingRoom[]>([]);
   const [artistOptions, setArtistOptions] = useState<ArtistOption[]>([]);
+  const [approvedGuestCount, setApprovedGuestCount] = useState(0);
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [addingRoom, setAddingRoom] = useState(false);
@@ -143,6 +144,15 @@ export function ShowDetailScreen({ route, navigation }: Props) {
 
     const { data: artistRows } = await supabase.from('artists').select('id, name').eq('tour_id', tourId).order('name', { ascending: true });
     setArtistOptions(artistRows ?? []);
+
+    // Same "approved only" reasoning as GuestListScreen's capacityWarning —
+    // pending requests haven't actually been let in yet.
+    const { data: guestRows } = await supabase
+      .from('guest_list_requests')
+      .select('guest_count')
+      .eq('tour_date_id', tourDateId)
+      .eq('status', 'approved');
+    setApprovedGuestCount((guestRows ?? []).reduce((sum, r) => sum + r.guest_count, 0));
   }
 
   async function handleAddRoom() {
@@ -232,6 +242,11 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   }
 
   const dateLabel = formatDateOnly(show.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const capacity = show.capacity_override ?? show.venue?.capacity ?? null;
+  const capacityWarning =
+    capacity && approvedGuestCount >= capacity * 0.9
+      ? `${approvedGuestCount} / ${capacity} approved — ${approvedGuestCount >= capacity ? 'at or over capacity' : 'approaching capacity'}`
+      : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -256,6 +271,7 @@ export function ShowDetailScreen({ route, navigation }: Props) {
               ? ` · Cap. ${(show.capacity_override ?? show.venue.capacity)!.toLocaleString()}`
               : ''}
           </Text>
+          {capacityWarning && <Text style={styles.capacityWarning}>{capacityWarning}</Text>}
           {photos.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow} contentContainerStyle={styles.photoRowContent}>
               {photos.map((photo) => (
@@ -322,9 +338,14 @@ export function ShowDetailScreen({ route, navigation }: Props) {
                       ))}
                     </ScrollView>
                   ) : (
-                    <Pressable onPress={() => setAssigningRoomId(room.id)}>
-                      <Text style={styles.sectionAction}>Assign</Text>
-                    </Pressable>
+                    <View style={styles.roomActions}>
+                      <Pressable onPress={() => setAssigningRoomId(room.id)}>
+                        <Text style={styles.sectionAction}>Assign</Text>
+                      </Pressable>
+                      <Pressable style={styles.deleteButton} onPress={() => confirmDeleteRoom(room)}>
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </Pressable>
+                    </View>
                   ))}
               </View>
             ))
@@ -409,12 +430,16 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 12 },
   venueName: { color: '#fff', fontSize: 17, fontWeight: '700' },
   venueMeta: { color: '#9a9aa5', fontSize: 13, marginTop: 4 },
+  capacityWarning: { color: '#e8c274', fontSize: 12, fontWeight: '600', marginTop: 6 },
   photoRow: { flexGrow: 0, marginTop: 12 },
   photoRowContent: { gap: 8 },
   photoThumb: { width: 96, height: 96, borderRadius: 10, backgroundColor: '#0b0b0f' },
   sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   sectionAction: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
+  roomActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   privacyNote: { color: '#6b6b76', fontSize: 11, marginBottom: 10, fontStyle: 'italic' },
   addRoomRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   addRoomInput: {

@@ -25,6 +25,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatRole, formatDepartment } from '../lib/format';
+import { logAuditEvent } from '../lib/auditLog';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ManageTeam'>;
@@ -53,6 +54,20 @@ export function ManageTeamScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Fire-and-forget — looks up this tour's org, then asks sync-org-seats
+  // to push a fresh seat count to Stripe if the org has an active
+  // subscription. Silently no-ops if the org isn't subscribed yet
+  // (sync-org-seats itself returns a clean 400 in that case).
+  async function resyncOrgSeats() {
+    try {
+      const { data: tour } = await supabase.from('tours').select('organization_id').eq('id', tourId).single();
+      if (!tour?.organization_id) return;
+      await supabase.functions.invoke('sync-org-seats', { body: { orgId: tour.organization_id } });
+    } catch {
+      // best-effort — never surfaced to the user
+    }
+  }
 
   async function load() {
     const [{ data: memberRows, error: memberError }, { data: inviteRows, error: inviteError }] = await Promise.all([
@@ -98,6 +113,24 @@ export function ManageTeamScreen({ route, navigation }: Props) {
             if (error) {
               setErrorMessage(error.message);
               return;
+            }
+            if (session) {
+              logAuditEvent({
+                tourId,
+                actorId: session.user.id,
+                action: 'delete',
+                resourceType: 'tour_member',
+                resourceId: member.user_id,
+                detail: { display_name: member.profile?.display_name, role: member.role, self: isSelf },
+              });
+              // Best-effort seat resync (fire-and-forget, mirrors
+              // logAuditEvent/notify's pattern) — a removal is one of the
+              // few roster changes that's both synchronous and
+              // client-visible enough to resync from; see
+              // compute_org_seat_count's own comment for why this isn't
+              // the primary reconciliation mechanism (it's recomputed
+              // live on every BillingScreen visit regardless).
+              resyncOrgSeats();
             }
             if (isSelf) {
               navigation.navigate('TourList');
@@ -161,7 +194,9 @@ export function ManageTeamScreen({ route, navigation }: Props) {
               {formatRole(m.role)} · {formatDepartment(m.department)}
             </Text>
           </View>
-          <Text style={styles.removeHint}>Hold to remove</Text>
+          <Pressable style={styles.deleteButton} onPress={() => confirmRemoveMember(m)}>
+            <Text style={styles.deleteButtonText}>Remove</Text>
+          </Pressable>
         </Pressable>
       ))}
 
@@ -176,7 +211,12 @@ export function ManageTeamScreen({ route, navigation }: Props) {
                   {inv.email} · {formatRole(inv.role)} · {formatDepartment(inv.department)}
                 </Text>
               </View>
-              <Text style={styles.pendingBadge}>Pending</Text>
+              <View style={styles.inviteActions}>
+                <Text style={styles.pendingBadge}>Pending</Text>
+                <Pressable style={styles.deleteButton} onPress={() => confirmCancelInvite(inv)}>
+                  <Text style={styles.deleteButtonText}>Cancel</Text>
+                </Pressable>
+              </View>
             </Pressable>
           ))}
         </>
@@ -209,6 +249,8 @@ const styles = StyleSheet.create({
   },
   name: { color: '#fff', fontSize: 14, fontWeight: '600' },
   meta: { color: '#6b6b76', fontSize: 12, marginTop: 2 },
-  removeHint: { color: '#6b6b76', fontSize: 11 },
   pendingBadge: { color: '#e8c274', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  inviteActions: { alignItems: 'flex-end', gap: 6 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
 });

@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,14 +28,17 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { registerForPushNotifications } from '../lib/pushNotifications';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 type OrgMembership = { organization_id: string; role: string; organization: { name: string } | null };
+type EnrollData = { factorId: string; secret: string; uri: string };
 
 export function SettingsScreen({ navigation }: Props) {
-  const { session, profile, refreshProfile, signOut } = useAuth();
+  const { session, profile, refreshProfile, signOut, refreshMfaStatus } = useAuth();
 
   const [preferredName, setPreferredName] = useState(profile?.preferred_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -42,6 +46,14 @@ export function SettingsScreen({ navigation }: Props) {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [registeringPush, setRegisteringPush] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [enrollData, setEnrollData] = useState<EnrollData | null>(null);
+  const [enrollCode, setEnrollCode] = useState('');
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [mfaStatus, setMfaStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useFocusEffect(
@@ -53,8 +65,98 @@ export function SettingsScreen({ navigation }: Props) {
           if (error) setErrorMessage(error.message);
           else setOrgs((data ?? []) as unknown as OrgMembership[]);
         });
+      loadMfaFactors();
     }, [])
   );
+
+  async function loadMfaFactors() {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) return;
+    const verified = data?.totp.find((f) => f.status === 'verified');
+    setMfaEnabled(!!verified);
+    setMfaFactorId(verified?.id ?? null);
+  }
+
+  // Two calls, in order: enroll() creates an *unverified* factor and
+  // hands back the secret/QR-equivalent URI (shown as raw text — no QR
+  // library in this app yet); it only counts as "on" once a code from it
+  // is actually verified below, same as any authenticator-app setup flow.
+  async function handleStartEnroll() {
+    setErrorMessage(null);
+    setMfaStatus(null);
+    setMfaBusy(true);
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+    setMfaBusy(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setEnrollData({ factorId: data.id, secret: data.totp.secret, uri: data.totp.uri });
+    setEnrollCode('');
+  }
+
+  async function handleConfirmEnroll() {
+    if (!enrollData) return;
+    setErrorMessage(null);
+    if (enrollCode.trim().length !== 6) {
+      setErrorMessage('Enter the 6-digit code from your authenticator app.');
+      return;
+    }
+    setMfaBusy(true);
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: enrollData.factorId });
+    if (challengeError) {
+      setMfaBusy(false);
+      setErrorMessage(challengeError.message);
+      return;
+    }
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: enrollData.factorId,
+      challengeId: challengeData.id,
+      code: enrollCode.trim(),
+    });
+    setMfaBusy(false);
+    if (verifyError) {
+      setErrorMessage(verifyError.message);
+      return;
+    }
+    setEnrollData(null);
+    setEnrollCode('');
+    setMfaStatus('Two-factor authentication is on.');
+    await loadMfaFactors();
+    await refreshMfaStatus();
+  }
+
+  function cancelEnroll() {
+    // Best-effort cleanup of the unverified factor so it doesn't linger —
+    // failure here is harmless (an unverified factor never gates
+    // anything), so it isn't surfaced as an error.
+    if (enrollData) supabase.auth.mfa.unenroll({ factorId: enrollData.factorId }).catch(() => {});
+    setEnrollData(null);
+    setEnrollCode('');
+  }
+
+  function confirmDisableMfa() {
+    if (!mfaFactorId) return;
+    Alert.alert('Turn off two-factor authentication?', "You'll only need your password to sign in.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Turn Off', style: 'destructive', onPress: handleDisableMfa },
+    ]);
+  }
+
+  async function handleDisableMfa() {
+    if (!mfaFactorId) return;
+    setErrorMessage(null);
+    setMfaBusy(true);
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+    setMfaBusy(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setMfaStatus('Two-factor authentication is off.');
+    await loadMfaFactors();
+    await refreshMfaStatus();
+  }
 
   async function handlePickAvatar() {
     setErrorMessage(null);
@@ -115,6 +217,17 @@ export function SettingsScreen({ navigation }: Props) {
       return;
     }
     await refreshProfile();
+  }
+
+  async function handleEnablePush() {
+    if (!session) return;
+    setErrorMessage(null);
+    setPushStatus(null);
+    setRegisteringPush(true);
+    const { error } = await registerForPushNotifications(session.user.id);
+    setRegisteringPush(false);
+    setPushStatus(error ? null : 'Push notifications are on for this device.');
+    if (error) setErrorMessage(error);
   }
 
   function confirmDeleteAccount() {
@@ -225,6 +338,73 @@ export function SettingsScreen({ navigation }: Props) {
         <Text style={styles.travelDocsText}>Passport & Visa</Text>
         <Text style={styles.orgAction}>›</Text>
       </Pressable>
+      <Pressable style={styles.travelDocsRow} onPress={() => navigation.navigate('EmergencyContact', {})}>
+        <Text style={styles.travelDocsText}>Emergency Contact</Text>
+        <Text style={styles.orgAction}>›</Text>
+      </Pressable>
+
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Notifications</Text>
+      <Pressable style={styles.travelDocsRow} onPress={handleEnablePush} disabled={registeringPush}>
+        {registeringPush ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.travelDocsText}>Enable Push Notifications</Text>
+        )}
+      </Pressable>
+      {pushStatus && <Text style={styles.pushStatus}>{pushStatus}</Text>}
+
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Security</Text>
+      {mfaStatus && <Text style={styles.pushStatus}>{mfaStatus}</Text>}
+
+      {enrollData ? (
+        <View style={styles.mfaSetupBox}>
+          <Text style={styles.mfaSetupLabel}>Scan or enter this manually in your authenticator app</Text>
+          <Text style={styles.mfaSecret} selectable>
+            {enrollData.secret}
+          </Text>
+          <Text style={styles.mfaUri} selectable>
+            {enrollData.uri}
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter the 6-digit code to confirm"
+            placeholderTextColor="#6b6b76"
+            value={enrollCode}
+            onChangeText={setEnrollCode}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          <View style={styles.mfaSetupActions}>
+            <Pressable style={[styles.saveButton, styles.mfaConfirmButton]} onPress={handleConfirmEnroll} disabled={mfaBusy}>
+              {mfaBusy ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Confirm</Text>}
+            </Pressable>
+            <Pressable style={styles.cancelEnrollButton} onPress={cancelEnroll} disabled={mfaBusy}>
+              <Text style={styles.cancelEnrollButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : mfaEnabled ? (
+        <View style={styles.travelDocsRow}>
+          <Text style={styles.travelDocsText}>Two-factor authentication is on</Text>
+          <Pressable onPress={confirmDisableMfa} disabled={mfaBusy}>
+            {mfaBusy ? <ActivityIndicator color="#ff6b6b" /> : <Text style={styles.mfaDisableText}>Turn off</Text>}
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable style={styles.travelDocsRow} onPress={handleStartEnroll} disabled={mfaBusy}>
+          {mfaBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.travelDocsText}>Enable Two-Factor Authentication</Text>}
+        </Pressable>
+      )}
+
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Legal</Text>
+      <Pressable style={styles.travelDocsRow} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+        <Text style={styles.travelDocsText}>Privacy Policy</Text>
+        <Text style={styles.orgAction}>›</Text>
+      </Pressable>
+      <Pressable style={styles.travelDocsRow} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
+        <Text style={styles.travelDocsText}>Terms of Service</Text>
+        <Text style={styles.orgAction}>›</Text>
+      </Pressable>
 
       <Pressable style={styles.signOutButton} onPress={signOut}>
         <Text style={styles.signOutButtonText}>Sign Out</Text>
@@ -299,6 +479,16 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   travelDocsText: { color: '#fff', fontSize: 14 },
+  pushStatus: { color: '#7ee787', fontSize: 12, marginTop: 6, marginBottom: 6 },
+  mfaSetupBox: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14 },
+  mfaSetupLabel: { color: '#9a9aa5', fontSize: 12, marginBottom: 8 },
+  mfaSecret: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
+  mfaUri: { color: '#6b6b76', fontSize: 11, marginBottom: 12 },
+  mfaSetupActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  mfaConfirmButton: { flex: 1, marginTop: 0 },
+  cancelEnrollButton: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  cancelEnrollButtonText: { color: '#9a9aa5', fontSize: 14, fontWeight: '600' },
+  mfaDisableText: { color: '#ff6b6b', fontSize: 13, fontWeight: '600' },
   signOutButton: { alignItems: 'center', paddingVertical: 14, marginTop: 28 },
   signOutButtonText: { color: '#9a9aa5', fontSize: 15, fontWeight: '600' },
   dangerZone: { marginTop: 20, borderTopWidth: 1, borderTopColor: '#2a2a32', paddingTop: 20 },

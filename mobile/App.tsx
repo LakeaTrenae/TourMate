@@ -11,6 +11,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from './lib/auth-context';
 import { AuthScreen } from './screens/AuthScreen';
 import { ResetPasswordScreen } from './screens/ResetPasswordScreen';
+import { MfaChallengeScreen } from './screens/MfaChallengeScreen';
 import { CompleteProfileScreen } from './screens/CompleteProfileScreen';
 import { TourListScreen } from './screens/TourListScreen';
 import { TourDashboardScreen } from './screens/TourDashboardScreen';
@@ -48,12 +49,19 @@ import { SeasonScreen } from './screens/SeasonScreen';
 import { ArtistsScreen } from './screens/ArtistsScreen';
 import { ArtistDetailScreen } from './screens/ArtistDetailScreen';
 import { DocumentSharingScreen } from './screens/DocumentSharingScreen';
+import { ViewDocumentScreen } from './screens/ViewDocumentScreen';
+import { AuditLogScreen } from './screens/AuditLogScreen';
+import { TourExportScreen } from './screens/TourExportScreen';
+import { EmergencyContactScreen } from './screens/EmergencyContactScreen';
+import { ChecklistSharingScreen } from './screens/ChecklistSharingScreen';
+import { AdvanceSharingScreen } from './screens/AdvanceSharingScreen';
+import { BillingScreen } from './screens/BillingScreen';
 import type { RootStackParamList } from './navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function RootNavigator() {
-  const { session, profile, loading, passwordRecovery } = useAuth();
+  const { session, profile, loading, passwordRecovery, mfaChallengePending } = useAuth();
 
   // Two things can make us show a spinner instead of real content:
   // the initial session check (`loading`), and — separately — having a
@@ -81,6 +89,11 @@ function RootNavigator() {
         // resetting their password mid-session should still hit this,
         // not their normal tour list).
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      ) : mfaChallengePending ? (
+        // Checked next, before the normal signed-in app — a session with
+        // an unmet MFA challenge has a user but shouldn't see anything
+        // else until it clears (see auth-context.tsx's checkMfaStatus).
+        <Stack.Screen name="MfaChallenge" component={MfaChallengeScreen} />
       ) : !session ? (
         <Stack.Screen name="Auth" component={AuthScreen} />
       ) : needsProfileCompletion ? (
@@ -114,6 +127,7 @@ function RootNavigator() {
           <Stack.Screen name="Checklists" component={ChecklistsScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddChecklist" component={AddChecklistScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ChecklistDetail" component={ChecklistDetailScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ChecklistSharing" component={ChecklistSharingScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Venues" component={VenuesScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddVenue" component={AddVenueScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="PassportVisa" component={PassportVisaScreen} options={{ headerShown: true, title: '' }} />
@@ -121,12 +135,18 @@ function RootNavigator() {
           <Stack.Screen name="AddGroundTransport" component={AddGroundTransportScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ShowDetail" component={ShowDetailScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Advance" component={AdvanceScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="AdvanceSharing" component={AdvanceSharingScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Settlement" component={SettlementScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Route" component={RouteScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="Billing" component={BillingScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Season" component={SeasonScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Artists" component={ArtistsScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ArtistDetail" component={ArtistDetailScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="DocumentSharing" component={DocumentSharingScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ViewDocument" component={ViewDocumentScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="AuditLog" component={AuditLogScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="TourExport" component={TourExportScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="EmergencyContact" component={EmergencyContactScreen} options={{ headerShown: true, title: '' }} />
         </>
       )}
     </Stack.Navigator>

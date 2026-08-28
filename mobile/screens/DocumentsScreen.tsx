@@ -14,7 +14,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -59,7 +58,6 @@ export function DocumentsScreen({ route, navigation }: Props) {
   const [isManager, setIsManager] = useState(false);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  const [openingId, setOpeningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -99,22 +97,10 @@ export function DocumentsScreen({ route, navigation }: Props) {
     setRefreshing(false);
   }
 
-  async function openDocument(doc: Doc) {
-    setOpeningId(doc.id);
-    setErrorMessage(null);
-    // Signed URL expires in 5 minutes — long enough to open the file,
-    // short enough that it's useless if it ends up somewhere it
-    // shouldn't (a screenshot, a forwarded message, browser history).
-    const { data, error } = await supabase.storage
-      .from('tour-documents')
-      .createSignedUrl(doc.storage_path, 60 * 5);
-    setOpeningId(null);
-
-    if (error || !data) {
-      setErrorMessage(error?.message ?? 'Failed to open document.');
-      return;
-    }
-    Linking.openURL(data.signedUrl);
+  function openDocument(doc: Doc) {
+    // ViewDocumentScreen fetches its own fresh signed URL on mount rather
+    // than reusing one generated here — see that screen's header comment.
+    navigation.navigate('ViewDocument', { bucket: 'tour-documents', storagePath: doc.storage_path, title: doc.title });
   }
 
   function confirmDelete(doc: Doc) {
@@ -208,7 +194,6 @@ export function DocumentsScreen({ route, navigation }: Props) {
               style={styles.card}
               onPress={() => openDocument(doc)}
               onLongPress={isManager ? () => confirmDelete(doc) : undefined}
-              disabled={openingId === doc.id}
             >
               <View style={styles.docInfo}>
                 <Text style={styles.docTitle}>{doc.title}</Text>
@@ -226,11 +211,18 @@ export function DocumentsScreen({ route, navigation }: Props) {
                   </Pressable>
                 )}
               </View>
-              {openingId === doc.id ? <ActivityIndicator color="#fff" /> : <Text style={styles.openArrow}>›</Text>}
+              <View style={styles.cardActions}>
+                {isManager && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(doc)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </Pressable>
+                )}
+                <Text style={styles.openArrow}>›</Text>
+              </View>
             </Pressable>
           ))
         )}
-        {isManager && filteredDocs.length > 0 && <Text style={styles.hint}>Hold a document to delete it.</Text>}
+        {isManager && filteredDocs.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a document) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -266,6 +258,9 @@ const styles = StyleSheet.create({
   docInfo: { flex: 1 },
   docMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
   shareLink: { color: '#7c9cff', fontSize: 12, fontWeight: '600', marginTop: 6 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   openArrow: { color: '#6b6b76', fontSize: 18 },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });

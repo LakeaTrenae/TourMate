@@ -174,6 +174,11 @@ export function GroundTransportScreen({ route, navigation }: Props) {
             >
               <View style={styles.cardHeader}>
                 <Text style={styles.vehicle}>{leg.vehicle_type ?? 'Transport'}{leg.company ? ` · ${leg.company}` : ''}</Text>
+                {isManager && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(leg)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </Pressable>
+                )}
               </View>
 
               <View style={styles.route}>
@@ -207,7 +212,7 @@ export function GroundTransportScreen({ route, navigation }: Props) {
             </Pressable>
           ))
         )}
-        {isManager && sortedLegs.length > 0 && <Text style={styles.hint}>Hold a leg to delete it.</Text>}
+        {isManager && sortedLegs.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a leg) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -225,8 +230,10 @@ const styles = StyleSheet.create({
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
   card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   vehicle: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   route: { flexDirection: 'row', alignItems: 'center' },
   leg: { flex: 1 },
   location: { color: '#fff', fontSize: 15, fontWeight: '700' },

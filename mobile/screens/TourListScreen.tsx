@@ -42,8 +42,10 @@ type TourRow = {
   start_date: string | null;
   end_date: string | null;
   completed_at: string | null;
-  organization: { name: string } | null;
+  organization: { id: string; name: string } | null;
 };
+
+type LockedOrg = { id: string; name: string };
 
 type DateStatus = 'in_progress' | 'upcoming' | 'past';
 type FilterMode = 'all' | DateStatus;
@@ -76,6 +78,7 @@ export function TourListScreen({ navigation }: Props) {
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lockedOrgs, setLockedOrgs] = useState<LockedOrg[]>([]);
 
   // `organization:organizations(name)` embeds the related org row via the
   // organization_id foreign key — one round trip instead of N+1 queries
@@ -86,7 +89,7 @@ export function TourListScreen({ navigation }: Props) {
   const fetchTours = useCallback(async () => {
     const { data, error } = await supabase
       .from('tours')
-      .select('id, name, start_date, end_date, completed_at, organization:organizations(name)');
+      .select('id, name, start_date, end_date, completed_at, organization:organizations(id, name)');
     if (error) throw error;
     return (data ?? []) as unknown as TourRow[];
   }, []);
@@ -97,9 +100,40 @@ export function TourListScreen({ navigation }: Props) {
   // useFocusEffect (not a plain useEffect) so the list re-fetches every
   // time this screen comes back into focus — e.g. after backing out of a
   // tour dashboard where something may have changed.
+  // Deliberately NOT a plain `organizations`/`organization_members`
+  // select — organization_members only ever contains the org creator
+  // (confirmed directly against live data: a crew member invited via
+  // tour_invites/tour_members never gets a row there), and tour_members
+  // itself IS gated by the billing lock (0034's effective_tour_role
+  // patch). A crew-only member would have no readable table left to
+  // learn their org is locked from — exactly the "tours silently
+  // vanish, no explanation" problem this banner exists to prevent. The
+  // my_organizations_billing_status RPC (0035) is deliberately NOT
+  // billing-gated for this exact reason: its whole purpose is to keep
+  // working once org_billing_active is false.
+  const fetchLockedOrgs = useCallback(async () => {
+    const { data, error } = await supabase.rpc('my_organizations_billing_status');
+    if (error) return; // best-effort — the tours query above still works either way
+    const now = Date.now();
+    const locked = ((data ?? []) as {
+      organization_id: string;
+      organization_name: string;
+      subscription_status: string;
+      trial_ends_at: string | null;
+    }[]).filter((org) => {
+      if (org.subscription_status === 'active') return false;
+      if (org.subscription_status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at).getTime() > now) {
+        return false;
+      }
+      return true; // past_due, canceled, none, or an expired trial
+    });
+    setLockedOrgs(locked.map((org) => ({ id: org.organization_id, name: org.organization_name })));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       refresh().catch((err) => setErrorMessage(err instanceof Error ? err.message : 'Failed to load tours.'));
+      fetchLockedOrgs();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -231,6 +265,17 @@ export function TourListScreen({ navigation }: Props) {
       {isOffline && <Text style={styles.offlineBanner}>You're offline — showing last synced data.</Text>}
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
+      {lockedOrgs.map((org) => (
+        <Pressable
+          key={org.id}
+          style={styles.lockedOrgBanner}
+          onPress={() => navigation.navigate('Billing', { organizationId: org.id, organizationName: org.name })}
+        >
+          <Text style={styles.lockedOrgText}>🔒 Billing needed for {org.name}</Text>
+          <Text style={styles.lockedOrgArrow}>›</Text>
+        </Pressable>
+      ))}
+
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -341,6 +386,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 12,
     textAlign: 'center',
+  },
+  lockedOrgBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2a1f15',
+    borderWidth: 1,
+    borderColor: '#e8c274',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  lockedOrgText: {
+    color: '#e8c274',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  lockedOrgArrow: {
+    color: '#e8c274',
+    fontSize: 18,
   },
   emptyContainer: {
     flexGrow: 1,

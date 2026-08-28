@@ -208,6 +208,18 @@ export function DirectoryScreen({ route, navigation }: Props) {
                       <Text style={styles.passportLink}>Passport & Visa ›</Text>
                     </Pressable>
                   )}
+                  {isManager && (
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate('EmergencyContact', {
+                          targetUserId: p.user_id,
+                          targetName: p.profile?.display_name ?? undefined,
+                        })
+                      }
+                    >
+                      <Text style={styles.passportLink}>Emergency Contact ›</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </View>

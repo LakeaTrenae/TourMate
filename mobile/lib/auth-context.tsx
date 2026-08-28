@@ -16,6 +16,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 
 import { supabase } from './supabase';
+import { registerForPushNotifications } from './pushNotifications';
 
 /**
  * Mirrors the `profiles` table (see supabase/migrations/0001_init.sql and
@@ -65,6 +66,15 @@ type AuthContextValue = {
   passwordRecovery: boolean;
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  /** True when this session has a verified TOTP factor but hasn't cleared
+   *  an MFA challenge yet this login (currentLevel 'aal1', nextLevel
+   *  'aal2') — RootNavigator uses this to force MfaChallengeScreen before
+   *  anything else, same pattern as passwordRecovery. */
+  mfaChallengePending: boolean;
+  /** Re-checks the assurance level — call after a successful
+   *  mfa.verify() so the gate clears immediately instead of waiting for
+   *  the next auth-state event. */
+  refreshMfaStatus: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -76,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [mfaChallengePending, setMfaChallengePending] = useState(false);
 
   // Fetch (or clear) the profile row whenever the session's user changes.
   // Profiles are auto-created by the `handle_new_user` DB trigger on
@@ -100,12 +111,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data);
   }
 
+  // A verified TOTP factor puts the *account* at aal2, but each fresh
+  // sign-in still starts the *session* at aal1 until a challenge is
+  // cleared — comparing currentLevel to nextLevel is how Supabase
+  // recommends detecting "this session still owes an MFA challenge"
+  // (unlike passwordRecovery, this isn't event-driven — there's no
+  // dedicated auth event for it, so it's checked explicitly instead).
+  async function checkMfaStatus() {
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error || !data) {
+      setMfaChallengePending(false);
+      return;
+    }
+    setMfaChallengePending(data.nextLevel === 'aal2' && data.currentLevel !== data.nextLevel);
+  }
+
   useEffect(() => {
     // On mount: check whether a session is already persisted (SecureStore —
     // see lib/supabase.ts) so a returning user skips the sign-in screen.
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
-      loadProfile(initialSession?.user.id).finally(() => setLoading(false));
+      Promise.all([loadProfile(initialSession?.user.id), checkMfaStatus()]).finally(() => setLoading(false));
     });
 
     // Then keep listening for changes: sign in, sign out, token refresh —
@@ -117,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       loadProfile(newSession?.user.id);
+      checkMfaStatus();
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
 
@@ -124,7 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signInWithPassword(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Fire-and-forget, best-effort — a denied permission or a missing EAS
+    // project link (see lib/pushNotifications.ts) should never block sign-in
+    // or surface as a sign-in error. SettingsScreen has a manual retry.
+    if (data?.user) {
+      registerForPushNotifications(data.user.id).catch(() => {});
+    }
     // Returning a plain string (not throwing) keeps error handling in the
     // calling screen simple — no try/catch required at every call site.
     return { error: error?.message ?? null };
@@ -145,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     setPasswordRecovery(false);
+    setMfaChallengePending(false);
     await supabase.auth.signOut();
   }
 
@@ -183,6 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         passwordRecovery,
         requestPasswordReset,
         updatePassword,
+        mfaChallengePending,
+        refreshMfaStatus: checkMfaStatus,
       }}
     >
       {children}

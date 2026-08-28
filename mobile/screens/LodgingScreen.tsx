@@ -189,7 +189,14 @@ export function LodgingScreen({ route, navigation }: Props) {
               style={styles.card}
               onLongPress={isManager ? () => confirmDelete(lodging) : undefined}
             >
-              <Text style={styles.hotelName}>{lodging.hotel_name}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={styles.hotelName}>{lodging.hotel_name}</Text>
+                {isManager && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(lodging)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </Pressable>
+                )}
+              </View>
               {lodging.address && <Text style={styles.address}>{lodging.address}</Text>}
               <Text style={styles.dates}>
                 {formatDate(lodging.check_in)} – {formatDate(lodging.check_out)}
@@ -213,7 +220,7 @@ export function LodgingScreen({ route, navigation }: Props) {
             </Pressable>
           ))
         )}
-        {isManager && lodgings.length > 0 && <Text style={styles.hint}>Hold a hotel to delete it.</Text>}
+        {isManager && lodgings.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a hotel) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -285,6 +292,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   address: {
     color: '#9a9aa5',
     fontSize: 13,

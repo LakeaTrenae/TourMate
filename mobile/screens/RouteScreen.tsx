@@ -12,10 +12,12 @@ import { useCallback, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 import { supabase } from '../lib/supabase';
 import { formatDateOnly } from '../lib/dates';
 import { haversineDistanceMiles } from '../lib/geo';
+import { buildRouteMapHtml } from '../lib/routeMapHtml';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Route'>;
@@ -35,6 +37,7 @@ export function RouteScreen({ route, navigation }: Props) {
   const [stops, setStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   async function load() {
     const { data, error } = await supabase
@@ -81,13 +84,41 @@ export function RouteScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Route</Text>
-        <Text style={styles.subtitle}>{tourName}</Text>
+        <View>
+          <Text style={styles.title}>Route</Text>
+          <Text style={styles.subtitle}>{tourName}</Text>
+        </View>
+        {stops.length > 0 && (
+          <Pressable style={styles.toggleButton} onPress={() => setShowMap((v) => !v)}>
+            <Text style={styles.toggleButtonText}>{showMap ? 'List View' : 'Map View'}</Text>
+          </Pressable>
+        )}
       </View>
       <Text style={styles.disclaimer}>Estimated straight-line distance between shows — not a driving route.</Text>
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
+      {showMap && stops.length > 0 ? (
+        <View style={styles.mapContainer}>
+          <WebView
+            source={{
+              html: buildRouteMapHtml(
+                stops
+                  .filter((s): s is Stop & { latitude: number; longitude: number } => s.latitude != null && s.longitude != null)
+                  .map((s) => ({
+                    label: `${formatDateOnly(s.date, { month: 'short', day: 'numeric' })} — ${s.venueName ?? 'No venue set'}`,
+                    latitude: s.latitude,
+                    longitude: s.longitude,
+                  }))
+              ),
+            }}
+            style={styles.map}
+          />
+          {stops.some((s) => s.latitude == null || s.longitude == null) && (
+            <Text style={styles.mapNote}>Some dates are missing venue coordinates and aren't shown on the map.</Text>
+          )}
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={stops.length === 0 && styles.emptyContainer}>
         {stops.length === 0 ? (
           <Text style={styles.emptyText}>No show dates yet.</Text>
@@ -117,6 +148,7 @@ export function RouteScreen({ route, navigation }: Props) {
           })
         )}
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -124,10 +156,15 @@ export function RouteScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
   centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: 4 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
   title: { color: '#fff', fontSize: 24, fontWeight: '700' },
   subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
+  toggleButton: { backgroundColor: '#1a1a20', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  toggleButtonText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
   disclaimer: { color: '#6b6b76', fontSize: 12, marginBottom: 16, fontStyle: 'italic' },
+  mapContainer: { flex: 1, borderRadius: 12, overflow: 'hidden' },
+  map: { flex: 1, backgroundColor: '#0b0b0f' },
+  mapNote: { color: '#6b6b76', fontSize: 11, fontStyle: 'italic', paddingVertical: 8 },
   error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },

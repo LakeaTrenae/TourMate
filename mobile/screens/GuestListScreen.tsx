@@ -25,11 +25,12 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatDateOnly } from '../lib/dates';
+import { notify } from '../lib/notify';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GuestList'>;
 
-type TourDate = { id: string; date: string };
+type TourDate = { id: string; date: string; capacity_override: number | null; venue: { capacity: number | null } | null };
 type GuestRequest = {
   id: string;
   tour_date_id: string;
@@ -65,14 +66,14 @@ export function GuestListScreen({ route, navigation }: Props) {
 
     const { data: dateRows, error: dateError } = await supabase
       .from('tour_dates')
-      .select('id, date')
+      .select('id, date, capacity_override, venue:venues(capacity)')
       .eq('tour_id', tourId)
       .order('date', { ascending: true });
     if (dateError) {
       setErrorMessage(dateError.message);
       return;
     }
-    setDates(dateRows ?? []);
+    setDates((dateRows ?? []) as unknown as TourDate[]);
 
     const dateIds = (dateRows ?? []).map((d) => d.id);
     if (dateIds.length === 0) {
@@ -109,17 +110,38 @@ export function GuestListScreen({ route, navigation }: Props) {
     setRefreshing(false);
   }
 
-  async function updateStatus(requestId: string, status: 'approved' | 'denied') {
-    const { error } = await supabase.from('guest_list_requests').update({ status }).eq('id', requestId);
+  async function updateStatus(request: GuestRequest, status: 'approved' | 'denied') {
+    const { error } = await supabase.from('guest_list_requests').update({ status }).eq('id', request.id);
     if (error) {
       setErrorMessage(error.message);
       return;
     }
+    notify({
+      tourId,
+      targetUserIds: [request.requested_by],
+      title: status === 'approved' ? 'Guest request approved' : 'Guest request denied',
+      body: request.guest_name,
+      data: { type: 'guest_list_status', requestId: request.id, status },
+    });
     await load();
   }
 
   function formatDate(dateStr: string) {
     return formatDateOnly(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  // Approaching/over capacity is judged against approved guests only —
+  // pending requests haven't actually been let in yet, so counting them
+  // would flag a date as over capacity before anyone actually said yes.
+  function capacityWarning(date: TourDate): string | null {
+    const capacity = date.capacity_override ?? date.venue?.capacity ?? null;
+    if (!capacity) return null;
+    const approvedCount = (requestsByDate[date.id] ?? [])
+      .filter((r) => r.status === 'approved')
+      .reduce((sum, r) => sum + r.guest_count, 0);
+    if (approvedCount >= capacity) return `${approvedCount} / ${capacity} approved — at or over capacity`;
+    if (approvedCount >= capacity * 0.9) return `${approvedCount} / ${capacity} approved — approaching capacity`;
+    return null;
   }
 
   // Deletion is manager-only, matching the RLS policy ("guest_list
@@ -176,9 +198,11 @@ export function GuestListScreen({ route, navigation }: Props) {
         ) : (
           dates.map((d) => {
             const requests = requestsByDate[d.id] ?? [];
+            const warning = capacityWarning(d);
             return (
               <View key={d.id} style={styles.dateGroup}>
                 <Text style={styles.dateLabel}>{formatDate(d.date)}</Text>
+                {warning && <Text style={styles.capacityWarning}>{warning}</Text>}
                 {requests.length === 0 ? (
                   <Text style={styles.emptyText}>No requests for this date.</Text>
                 ) : (
@@ -196,16 +220,23 @@ export function GuestListScreen({ route, navigation }: Props) {
                       </View>
                       <Text style={styles.requester}>Requested by {r.requester?.display_name ?? 'Unknown'}</Text>
                       {r.notes && <Text style={styles.notes}>{r.notes}</Text>}
-                      {isManager && r.status === 'pending' && (
+                      {isManager ? (
                         <View style={styles.actions}>
-                          <Pressable style={styles.approveButton} onPress={() => updateStatus(r.id, 'approved')}>
-                            <Text style={styles.approveButtonText}>Approve</Text>
-                          </Pressable>
-                          <Pressable style={styles.denyButton} onPress={() => updateStatus(r.id, 'denied')}>
-                            <Text style={styles.denyButtonText}>Deny</Text>
+                          {r.status === 'pending' && (
+                            <>
+                              <Pressable style={styles.approveButton} onPress={() => updateStatus(r, 'approved')}>
+                                <Text style={styles.approveButtonText}>Approve</Text>
+                              </Pressable>
+                              <Pressable style={styles.denyButton} onPress={() => updateStatus(r, 'denied')}>
+                                <Text style={styles.denyButtonText}>Deny</Text>
+                              </Pressable>
+                            </>
+                          )}
+                          <Pressable style={styles.deleteButton} onPress={() => confirmDelete(r)}>
+                            <Text style={styles.deleteButtonText}>Delete</Text>
                           </Pressable>
                         </View>
-                      )}
+                      ) : null}
                     </Pressable>
                   ))
                 )}
@@ -213,7 +244,7 @@ export function GuestListScreen({ route, navigation }: Props) {
             );
           })
         )}
-        {isManager && dates.length > 0 && <Text style={styles.hint}>Hold a request to delete it.</Text>}
+        {isManager && dates.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a request) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -238,6 +269,7 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6b6b76', fontSize: 13, textAlign: 'center' },
   dateGroup: { marginBottom: 18 },
   dateLabel: { color: '#9a9aa5', fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  capacityWarning: { color: '#e8c274', fontSize: 12, fontWeight: '600', marginBottom: 8 },
   card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 14, marginBottom: 8 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   guestName: { color: '#fff', fontSize: 15, fontWeight: '600' },
@@ -249,5 +281,7 @@ const styles = StyleSheet.create({
   approveButtonText: { color: '#7ee787', fontSize: 12, fontWeight: '600' },
   denyButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   denyButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
+  deleteButton: { backgroundColor: '#2a2a32', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  deleteButtonText: { color: '#9a9aa5', fontSize: 12, fontWeight: '600' },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 4 },
 });

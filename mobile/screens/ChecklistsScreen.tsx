@@ -188,12 +188,26 @@ export function ChecklistsScreen({ route, navigation }: Props) {
                   {!c.visible_to_all ? ' · Department only' : ''}
                   {c.item_count > 0 ? ` · ${c.checked_count}/${c.item_count} done` : ' · No items yet'}
                 </Text>
+                {canEdit(c) && (
+                  <Pressable
+                    onPress={() => navigation.navigate('ChecklistSharing', { checklistId: c.id, tourId, checklistTitle: c.title })}
+                  >
+                    <Text style={styles.shareLink}>Share ›</Text>
+                  </Pressable>
+                )}
               </View>
-              <Text style={styles.openArrow}>›</Text>
+              <View style={styles.cardActions}>
+                {canEdit(c) && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(c)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </Pressable>
+                )}
+                <Text style={styles.openArrow}>›</Text>
+              </View>
             </Pressable>
           ))
         )}
-        {checklists.length > 0 && <Text style={styles.hint}>Hold a checklist to delete it.</Text>}
+        {checklists.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a checklist) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -221,6 +235,10 @@ const styles = StyleSheet.create({
   },
   checklistTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
   checklistMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
+  shareLink: { color: '#7c9cff', fontSize: 12, fontWeight: '600', marginTop: 6 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   openArrow: { color: '#6b6b76', fontSize: 18 },
   hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });

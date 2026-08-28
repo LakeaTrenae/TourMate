@@ -279,15 +279,18 @@ export function AddVenueScreen({ route, navigation }: Props) {
           <Text style={styles.photosHint}>So the crew knows what the stage looks like before load-in.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow} contentContainerStyle={styles.photoRowContent}>
             {photos.map((photo) => (
-              <Pressable key={photo.id} onLongPress={() => confirmDeletePhoto(photo)}>
+              <Pressable key={photo.id} style={styles.photoWrap} onLongPress={() => confirmDeletePhoto(photo)}>
                 <Image source={{ uri: photo.url }} style={styles.photoThumb} />
+                <Pressable style={styles.photoDeleteButton} onPress={() => confirmDeletePhoto(photo)}>
+                  <Text style={styles.photoDeleteButtonText}>✕</Text>
+                </Pressable>
               </Pressable>
             ))}
             <Pressable style={styles.addPhotoButton} onPress={handlePickPhoto} disabled={uploadingPhoto}>
               {uploadingPhoto ? <ActivityIndicator color="#7c9cff" /> : <Text style={styles.addPhotoButtonText}>+ Photo</Text>}
             </Pressable>
           </ScrollView>
-          {photos.length > 0 && <Text style={styles.photosHint}>Hold a photo to delete it.</Text>}
+          {photos.length > 0 && <Text style={styles.photosHint}>Tap the ✕ (or hold a photo) to delete it.</Text>}
         </>
       )}
 
@@ -331,7 +334,20 @@ const styles = StyleSheet.create({
   photosHint: { color: '#6b6b76', fontSize: 12, marginBottom: 8 },
   photoRow: { flexGrow: 0 },
   photoRowContent: { gap: 10, paddingRight: 8 },
+  photoWrap: { position: 'relative' },
   photoThumb: { width: 88, height: 88, borderRadius: 10, backgroundColor: '#1a1a20' },
+  photoDeleteButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ff6b6b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoDeleteButtonText: { color: '#0b0b0f', fontSize: 12, fontWeight: '700' },
   addPhotoButton: {
     width: 88,
     height: 88,

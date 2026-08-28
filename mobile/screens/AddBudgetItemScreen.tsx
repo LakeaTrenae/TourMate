@@ -25,6 +25,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { logAuditEvent } from '../lib/auditLog';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddBudgetItem'>;
@@ -106,6 +107,15 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
         return;
       }
     }
+
+    logAuditEvent({
+      tourId,
+      actorId: session.user.id,
+      action: 'create',
+      resourceType: 'budget_item',
+      resourceId: itemId,
+      detail: { category: category.trim(), amount: parsedAmount, entry_type: entryType },
+    });
 
     setSubmitting(false);
     navigation.goBack();

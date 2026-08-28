@@ -24,6 +24,12 @@
     },
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "081f44cd-707a-40e7-b477-533136d5e0f8"
+      }
+    },
+    "owner": "lakeatrenae"
   }
 }

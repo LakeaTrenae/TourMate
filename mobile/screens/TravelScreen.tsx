@@ -177,7 +177,14 @@ export function TravelScreen({ route, navigation }: Props) {
                 <Text style={styles.airline}>
                   {flight.airline ?? 'Flight'} {flight.flight_number ?? ''}
                 </Text>
-                {flight.status && <Text style={styles.status}>{flight.status}</Text>}
+                <View style={styles.cardHeaderRight}>
+                  {flight.status && <Text style={styles.status}>{flight.status}</Text>}
+                  {isManager && (
+                    <Pressable style={styles.deleteButton} onPress={() => confirmDelete(flight)}>
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
 
               <View style={styles.route}>
@@ -207,7 +214,7 @@ export function TravelScreen({ route, navigation }: Props) {
             </Pressable>
           ))
         )}
-        {isManager && sortedFlights.length > 0 && <Text style={styles.hint}>Hold a flight to delete it.</Text>}
+        {isManager && sortedFlights.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a flight) to remove it.</Text>}
       </ScrollView>
     </View>
   );
@@ -277,8 +284,12 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
+  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
   airline: {
     color: '#fff',
     fontSize: 15,

@@ -28,6 +28,9 @@ import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { formatDepartment } from '../lib/format';
+import { readFileAsBase64 } from '../lib/files';
+import { logAuditEvent } from '../lib/auditLog';
+import { notify } from '../lib/notify';
 import type { RootStackParamList } from '../navigation/types';
 
 type ArtistOption = { id: string; name: string };
@@ -63,6 +66,8 @@ export function AddDocumentScreen({ route, navigation }: Props) {
   const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [artistId, setArtistId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [suggestionHint, setSuggestionHint] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,7 +105,47 @@ export function AddDocumentScreen({ route, navigation }: Props) {
     if (result.canceled || result.assets.length === 0) return;
     const asset = result.assets[0];
     setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? null });
+    setSuggestionHint(null);
     if (!title.trim()) setTitle(asset.name.replace(/\.[^/.]+$/, '')); // default title from filename, sans extension
+  }
+
+  // "AI drafts, human confirms" — every field this pre-fills stays in the
+  // normal editable inputs below, nothing commits until Upload is
+  // pressed. Deliberately never suggests visibility/sharing — who can
+  // see a document is an access-control decision, not something to infer
+  // from content.
+  async function handleSuggestDetails() {
+    if (!file) return;
+    setErrorMessage(null);
+    setSuggestionHint(null);
+    setExtracting(true);
+    try {
+      const base64Data = await readFileAsBase64(file.uri);
+      const { data, error } = await supabase.functions.invoke('extract-document-metadata', {
+        body: { tourId, fileName: file.name, mimeType: file.mimeType ?? 'application/octet-stream', base64Data },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.title) setTitle(data.title);
+      if (data?.category && CATEGORIES.some((c) => c.value === data.category)) setCategory(data.category);
+
+      if (data?.artist_name) {
+        const match = artists.find((a) => a.name.toLowerCase() === String(data.artist_name).toLowerCase());
+        if (match) {
+          setArtistId(match.id);
+          setSuggestionHint(`Details suggested — tagged to ${match.name}.`);
+        } else {
+          setSuggestionHint(`Details suggested — AI mentioned "${data.artist_name}", not in this tour's roster, tag manually if needed.`);
+        }
+      } else {
+        setSuggestionHint('Details suggested.');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Could not suggest details for this file.');
+    } finally {
+      setExtracting(false);
+    }
   }
 
   async function handleSubmit() {
@@ -176,6 +221,27 @@ export function AddDocumentScreen({ route, navigation }: Props) {
         setErrorMessage(`Document uploaded, but sharing failed: ${shareError.message}`);
         return;
       }
+
+      logAuditEvent({
+        tourId,
+        actorId: session.user.id,
+        action: 'share',
+        resourceType: 'resource_share',
+        resourceId: documentId,
+        detail: { resource_type: 'document', user_count: selectedUserIds.size, department_count: selectedDepartments.size },
+      });
+
+      // Notify specifically-shared people directly, plus everyone in a
+      // shared department (resolved from the already-fetched roster).
+      const departmentTargets = roster.filter((r) => selectedDepartments.has(r.department)).map((r) => r.user_id);
+      const allTargets = Array.from(new Set([...selectedUserIds, ...departmentTargets]));
+      notify({
+        tourId,
+        targetUserIds: allTargets,
+        title: 'Document shared with you',
+        body: title.trim(),
+        data: { type: 'document_share', documentId },
+      });
     }
 
     try {
@@ -206,6 +272,13 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       <Pressable style={styles.filePicker} onPress={handlePickFile}>
         <Text style={styles.filePickerText}>{file ? file.name : 'Choose a file…'}</Text>
       </Pressable>
+
+      {file && (
+        <Pressable style={styles.suggestButton} onPress={handleSuggestDetails} disabled={extracting}>
+          {extracting ? <ActivityIndicator color="#7c9cff" /> : <Text style={styles.suggestButtonText}>Suggest details ✨</Text>}
+        </Pressable>
+      )}
+      {suggestionHint && <Text style={styles.suggestionHint}>{suggestionHint}</Text>}
 
       <TextInput style={styles.input} placeholder="Title" placeholderTextColor="#6b6b76" value={title} onChangeText={setTitle} />
 
@@ -321,6 +394,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filePickerText: { color: '#9a9aa5', fontSize: 14 },
+  suggestButton: {
+    backgroundColor: '#15151a',
+    borderWidth: 1,
+    borderColor: '#2a2a32',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  suggestButtonText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
+  suggestionHint: { color: '#6b6b76', fontSize: 12, marginBottom: 10 },
   input: {
     backgroundColor: '#1a1a20',
     color: '#fff',
