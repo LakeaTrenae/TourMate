@@ -417,3 +417,10 @@ enabled = true
 # the function itself. See supabase/functions/stripe-webhook/index.ts.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# billing-daily-checks is invoked by pg_cron (see
+# 0036_billing_notifications_and_seat_sync.sql), which sends no Supabase
+# JWT either — identity comes from an x-cron-secret header instead. See
+# supabase/functions/billing-daily-checks/index.ts.
+[functions.billing-daily-checks]
+verify_jwt = false

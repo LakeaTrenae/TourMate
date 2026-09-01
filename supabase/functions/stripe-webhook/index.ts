@@ -15,10 +15,19 @@
 // comes from client_reference_id), customer.subscription.updated /
 // .deleted (ongoing status changes — org id from subscription_data's
 // metadata.organization_id, set at checkout time, falling back to a
-// stripe_subscription_id lookup), invoice.payment_failed (logged only —
-// the authoritative status change follows moments later via
-// customer.subscription.updated, so writing from this event too would
-// just race it).
+// stripe_subscription_id lookup), invoice.payment_failed (pushes a
+// notification to the org's owner/admin — does NOT write subscription_status
+// itself, since the authoritative status change follows moments later via
+// customer.subscription.updated and writing from both would race it).
+//
+// Every event is deduped by id against stripe_webhook_events
+// (0036_billing_notifications_and_seat_sync.sql) before processing —
+// Stripe explicitly documents that webhooks can be delivered more than
+// once. The org-status writes above are naturally idempotent (they just
+// overwrite with the latest state), but the payment-failed notification
+// below is a side effect, not a state write, and side effects aren't
+// idempotent for free — without the dedup, a redelivered event could
+// alert an admin twice for the same failure.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@^22.4.0";
 
@@ -107,6 +116,56 @@ async function resolveOrgId(subscription: Stripe.Subscription): Promise<string |
   return data?.id ?? null;
 }
 
+// Duplicated from send-notification's own version rather than factored
+// into a shared module — small enough, and this repo has no _shared/
+// precedent yet. Expo's push API needs no API key to send to.
+async function sendPushToUsers(userIds: string[], title: string, body: string, data?: Record<string, unknown>) {
+  if (userIds.length === 0) return;
+  const { data: tokenRows } = await admin.from("push_tokens").select("expo_push_token").in("user_id", userIds);
+  const tokens = (tokenRows ?? []).map((r: { expo_push_token: string }) => r.expo_push_token);
+  if (tokens.length === 0) return;
+  const messages = tokens.map((to: string) => ({ to, title, body, data: data ?? {}, sound: "default" }));
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(messages),
+  });
+  if (!response.ok) console.error("Expo push failed:", await response.text());
+}
+
+async function notifyPaymentFailed(invoice: Stripe.Invoice) {
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  if (!customerId) return;
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("id, name, subscription_status")
+    .eq("billing_customer_id", customerId)
+    .maybeSingle();
+  if (!org) return;
+
+  // Only alert on the *first* failure for this billing cycle — once
+  // customer.subscription.updated has already flipped the org to
+  // past_due/canceled, Stripe's retry schedule will keep sending
+  // invoice.payment_failed for the same underlying problem, and none of
+  // those are new news to the admin.
+  if (org.subscription_status === "past_due" || org.subscription_status === "canceled") return;
+
+  const { data: members } = await admin
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", org.id)
+    .in("role", ["owner", "admin"]);
+  const targets = (members ?? []).map((r: { user_id: string }) => r.user_id);
+
+  await sendPushToUsers(
+    targets,
+    `Payment failed — ${org.name}`,
+    "We couldn't process your payment. Update your billing to avoid losing access.",
+    { type: "payment_failed", organizationId: org.id }
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok");
@@ -128,6 +187,18 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });
+  }
+
+  // Dedup by event id — see file header. A unique-violation means we've
+  // already processed this exact event; ack it without reprocessing.
+  // Any other insert error fails open (still processes the event) rather
+  // than silently dropping a real webhook over a transient DB hiccup.
+  const { error: dedupError } = await admin.from("stripe_webhook_events").insert({ event_id: event.id });
+  if (dedupError && dedupError.code === "23505") {
+    return new Response(JSON.stringify({ received: true, duplicate: true }), { status: 200 });
+  }
+  if (dedupError) {
+    console.error("Webhook dedup insert failed (processing anyway):", dedupError);
   }
 
   try {
@@ -168,9 +239,10 @@ Deno.serve(async (req) => {
         break;
       }
       case "invoice.payment_failed": {
-        // Logged only — see file header. The authoritative status change
-        // arrives via customer.subscription.updated moments later.
-        console.log("Invoice payment failed:", (event.data.object as Stripe.Invoice).id);
+        // Does not write subscription_status itself — see file header.
+        const invoice = event.data.object as Stripe.Invoice;
+        console.log("Invoice payment failed:", invoice.id);
+        await notifyPaymentFailed(invoice);
         break;
       }
       default:
