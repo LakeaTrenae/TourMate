@@ -5,8 +5,11 @@
  * requestPasswordReset's email. Supabase has already exchanged that
  * link's token for a temporary session by this point — this screen just
  * collects the new password and calls updateUser.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,9 +21,12 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 
 export function ResetPasswordScreen() {
   const { updatePassword, signOut } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +61,7 @@ export function ResetPasswordScreen() {
       <TextInput
         style={styles.input}
         placeholder="New password"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -64,7 +70,7 @@ export function ResetPasswordScreen() {
       <TextInput
         style={styles.input}
         placeholder="Confirm password"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={confirm}
         onChangeText={setConfirm}
         secureTextEntry
@@ -74,7 +80,7 @@ export function ResetPasswordScreen() {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Update Password</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Update Password</Text>}
       </Pressable>
 
       <Pressable onPress={signOut}>
@@ -84,21 +90,26 @@ export function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', justifyContent: 'center', paddingHorizontal: 24 },
-  title: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
-  subtitle: { color: '#9a9aa5', fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 28 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  submitButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-  cancelText: { color: '#6b6b76', fontSize: 13, textAlign: 'center' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 24 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 28, fontFamily: fonts.body },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+      fontSize: 16,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    cancelText: { color: colors.textFaint, fontSize: 13, textAlign: 'center', fontFamily: fonts.body },
+  });
+}

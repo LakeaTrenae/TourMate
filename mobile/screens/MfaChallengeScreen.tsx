@@ -10,8 +10,11 @@
  * against the 6-digit code the user enters (`mfa.verify`) — on success,
  * Supabase refreshes the session to aal2 and refreshMfaStatus() re-reads
  * that so RootNavigator moves on immediately.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -24,9 +27,13 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 
 export function MfaChallengeScreen() {
   const { signOut, refreshMfaStatus } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [factorId, setFactorId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -87,7 +94,7 @@ export function MfaChallengeScreen() {
   if (preparing) {
     return (
       <KeyboardAvoidingView style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </KeyboardAvoidingView>
     );
   }
@@ -100,7 +107,7 @@ export function MfaChallengeScreen() {
       <TextInput
         style={styles.input}
         placeholder="123456"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={code}
         onChangeText={setCode}
         keyboardType="number-pad"
@@ -112,7 +119,7 @@ export function MfaChallengeScreen() {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleVerify} disabled={verifying || !factorId || !challengeId}>
-        {verifying ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Verify</Text>}
+        {verifying ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Verify</Text>}
       </Pressable>
 
       <Pressable onPress={signOut}>
@@ -122,24 +129,29 @@ export function MfaChallengeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', justifyContent: 'center', paddingHorizontal: 24 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
-  subtitle: { color: '#9a9aa5', fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 28 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    fontSize: 20,
-    textAlign: 'center',
-    letterSpacing: 6,
-  },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12, textAlign: 'center' },
-  submitButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-  cancelText: { color: '#6b6b76', fontSize: 13, textAlign: 'center' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 24 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 28, fontFamily: fonts.body },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+      fontSize: 20,
+      fontFamily: fonts.mono,
+      textAlign: 'center',
+      letterSpacing: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center', fontFamily: fonts.body },
+    submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    cancelText: { color: colors.textFaint, fontSize: 13, textAlign: 'center', fontFamily: fonts.body },
+  });
+}

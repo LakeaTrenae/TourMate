@@ -2,8 +2,11 @@
  * AddGuestRequestScreen — submit a guest list request for a specific show
  * date. Reachable by anyone on the tour (not manager-gated) — matches
  * "guest_list insertable by members" in 0001_init.sql.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -18,6 +21,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatDateOnly } from '../lib/dates';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddGuestRequest'>;
@@ -27,6 +31,8 @@ type TourDate = { id: string; date: string };
 export function AddGuestRequestScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [dates, setDates] = useState<TourDate[]>([]);
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
@@ -107,59 +113,66 @@ export function AddGuestRequestScreen({ route, navigation }: Props) {
         </Pressable>
       ))}
 
-      <TextInput style={styles.input} placeholder="Guest name" placeholderTextColor="#6b6b76" value={guestName} onChangeText={setGuestName} />
+      <TextInput style={styles.input} placeholder="Guest name" placeholderTextColor={colors.textFaint} value={guestName} onChangeText={setGuestName} />
       <TextInput
         style={styles.input}
         placeholder="Number of guests"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={guestCount}
         onChangeText={setGuestCount}
         keyboardType="number-pad"
       />
-      <TextInput style={styles.input} placeholder="Notes (optional)" placeholderTextColor="#6b6b76" value={notes} onChangeText={setNotes} multiline />
+      <TextInput style={styles.input} placeholder="Notes (optional)" placeholderTextColor={colors.textFaint} value={notes} onChangeText={setNotes} multiline />
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Submit Request</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Submit Request</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  dateRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  dateRowSelected: { backgroundColor: '#2a2a3a' },
-  dateRowText: { color: '#fff', fontSize: 14 },
-  check: { color: '#7c9cff', fontSize: 14, fontWeight: '700' },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 12,
-    fontSize: 15,
-  },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 8 },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    sectionTitle: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold, marginBottom: 8 },
+    dateRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    dateRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+    dateRowText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    check: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginTop: 12,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: { color: colors.danger, fontSize: 13, marginTop: 8, fontFamily: fonts.body },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

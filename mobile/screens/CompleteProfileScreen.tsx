@@ -8,8 +8,11 @@
  * `profile.preferred_name` is still null. Skippable — leaving it blank
  * just means `display_name` falls back to first_name (see the generated
  * column in 0006_profile_names.sql), so nobody gets stuck here.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -23,9 +26,12 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 
 export function CompleteProfileScreen() {
   const { profile, session, refreshProfile, signOut } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [preferredName, setPreferredName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,7 +72,7 @@ export function CompleteProfileScreen() {
       <TextInput
         style={styles.input}
         placeholder={profile?.first_name ?? 'Preferred name'}
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={preferredName}
         onChangeText={setPreferredName}
         autoCapitalize="words"
@@ -80,7 +86,7 @@ export function CompleteProfileScreen() {
         onPress={() => handleSave(false)}
         disabled={submitting || !preferredName.trim()}
       >
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Save</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Save</Text>}
       </Pressable>
 
       <Pressable onPress={() => handleSave(true)} disabled={submitting}>
@@ -96,65 +102,75 @@ export function CompleteProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#9a9aa5',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 28,
-    lineHeight: 20,
-  },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  submitButtonText: {
-    color: '#0b0b0f',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  skipText: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  footer: {
-    marginTop: 40,
-    alignItems: 'center',
-  },
-  signOut: {
-    color: '#6b6b76',
-    fontSize: 13,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 28,
+      fontFamily: fonts.displayBlack,
+      textAlign: 'center',
+      letterSpacing: -0.4,
+    },
+    subtitle: {
+      color: colors.textDim,
+      fontSize: 14,
+      textAlign: 'center',
+      marginTop: 10,
+      marginBottom: 28,
+      lineHeight: 20,
+      fontFamily: fonts.body,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+      fontSize: 16,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginBottom: 12,
+      fontFamily: fonts.body,
+    },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    submitButtonText: {
+      color: colors.onAccent,
+      fontSize: 16,
+      fontFamily: fonts.bodySemiBold,
+    },
+    skipText: {
+      color: colors.textDim,
+      fontSize: 13,
+      textAlign: 'center',
+      fontFamily: fonts.body,
+    },
+    footer: {
+      marginTop: 40,
+      alignItems: 'center',
+    },
+    signOut: {
+      color: colors.textFaint,
+      fontSize: 13,
+      fontFamily: fonts.body,
+    },
+  });
+}
