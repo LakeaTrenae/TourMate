@@ -9,8 +9,11 @@
  * Only reachable for managers (the "Share" action on DocumentsScreen is
  * manager-gated) — matches "resource_shares insertable/deletable by
  * resource owner" (0003/0028), which for documents means is_tour_manager.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -21,6 +24,7 @@ import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { formatDepartment } from '../lib/format';
 import { logAuditEvent } from '../lib/auditLog';
 import { notify } from '../lib/notify';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DocumentSharing'>;
@@ -32,6 +36,8 @@ type Share = { id: string; shared_with_user_id: string | null; shared_with_depar
 export function DocumentSharingScreen({ route }: Props) {
   const { documentId, tourId, docTitle } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [visibility, setVisibility] = useState<'org' | 'managers_only' | null>(null);
   const [shares, setShares] = useState<Share[]>([]);
@@ -112,7 +118,7 @@ export function DocumentSharingScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -156,29 +162,31 @@ export function DocumentSharingScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  orgNote: { color: '#e8c274', fontSize: 12, marginBottom: 16, fontStyle: 'italic' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  sectionLabel: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
-  sectionLabelSpaced: { marginTop: 20 },
-  emptyText: { color: '#6b6b76', fontSize: 13 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#6b6b76',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  checkboxChecked: { backgroundColor: '#7c9cff', borderColor: '#7c9cff' },
-  checkmark: { color: '#0b0b0f', fontSize: 13, fontWeight: '700' },
-  checkboxLabel: { color: '#fff', fontSize: 15 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    orgNote: { color: colors.warn, fontSize: 12, marginBottom: 16, fontStyle: 'italic', fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    sectionLabelSpaced: { marginTop: 20 },
+    emptyText: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.textFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
+    checkmark: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodyBold },
+    checkboxLabel: { color: colors.text, fontSize: 15, fontFamily: fonts.body },
+  });
+}
