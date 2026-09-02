@@ -11,8 +11,11 @@
  * (fetchTourRoster) — this doesn't create new accounts, it just marks an
  * existing tour member as "on Artist X's team," which is what flips
  * their visibility into this artist's private data.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -35,6 +38,7 @@ import { newId } from '../lib/ids';
 import { logAuditEvent } from '../lib/auditLog';
 import { notify } from '../lib/notify';
 import { formatDateOnly } from '../lib/dates';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArtistDetail'>;
@@ -49,6 +53,8 @@ const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 export function ArtistDetailScreen({ route, navigation }: Props) {
   const { artistId, tourId, artistName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [canManage, setCanManage] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -226,7 +232,7 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -235,7 +241,7 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
     >
       <Text style={styles.title}>{artistName}</Text>
       <Text style={styles.privacyNote}>Visible only to tour management and this artist's own team.</Text>
@@ -252,14 +258,14 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       </View>
       {showAddContact && (
         <View style={styles.addCard}>
-          <TextInput style={styles.input} placeholder="Name" placeholderTextColor="#6b6b76" value={contactName} onChangeText={setContactName} />
-          <TextInput style={styles.input} placeholder="Role (Tour Manager, Agent...)" placeholderTextColor="#6b6b76" value={contactRole} onChangeText={setContactRole} />
+          <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.textFaint} value={contactName} onChangeText={setContactName} />
+          <TextInput style={styles.input} placeholder="Role (Tour Manager, Agent...)" placeholderTextColor={colors.textFaint} value={contactRole} onChangeText={setContactRole} />
           <View style={styles.row}>
-            <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor="#6b6b76" value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" />
-            <TextInput style={[styles.input, styles.rowInput]} placeholder="Email" placeholderTextColor="#6b6b76" value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" />
+            <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor={colors.textFaint} value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" />
+            <TextInput style={[styles.input, styles.rowInput]} placeholder="Email" placeholderTextColor={colors.textFaint} value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" />
           </View>
           <Pressable style={styles.saveButton} onPress={handleAddContact} disabled={savingContact || !contactName.trim()}>
-            {savingContact ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save Contact</Text>}
+            {savingContact ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save Contact</Text>}
           </Pressable>
         </View>
       )}
@@ -361,51 +367,68 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  privacyNote: { color: '#6b6b76', fontSize: 12, marginTop: 4, marginBottom: 16, fontStyle: 'italic' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionSpaced: { marginTop: 20 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' },
-  sectionAction: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  emptyText: { color: '#6b6b76', fontSize: 13, marginBottom: 8 },
-  addCard: { backgroundColor: '#15151a', borderRadius: 12, padding: 14, marginBottom: 10 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  row: { flexDirection: 'row', gap: 8 },
-  rowInput: { flex: 1 },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 14, fontWeight: '600' },
-  card: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14, marginBottom: 8 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardMain: { flex: 1 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  contactName: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  contactRole: { color: '#9a9aa5', fontSize: 12, marginTop: 2 },
-  contactLink: { color: '#7c9cff', fontSize: 13, marginTop: 4 },
-  rosterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  rosterName: { color: '#fff', fontSize: 14 },
-  rosterAdd: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 4 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    privacyNote: { color: colors.textFaint, fontSize: 12, marginTop: 4, marginBottom: 16, fontStyle: 'italic', fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    sectionSpaced: { marginTop: 20 },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+    sectionAction: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    emptyText: { color: colors.textFaint, fontSize: 13, marginBottom: 8, fontFamily: fonts.body },
+    addCard: { backgroundColor: colors.surface2, borderRadius: 12, padding: 14, marginBottom: 10 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 8,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: { flexDirection: 'row', gap: 8 },
+    rowInput: { flex: 1 },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+    saveButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    cardMain: { flex: 1 },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
+    deleteButtonText: { color: colors.danger, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    contactName: { color: colors.text, fontSize: 14, fontFamily: fonts.displaySemiBold },
+    contactRole: { color: colors.textDim, fontSize: 12, marginTop: 2, fontFamily: fonts.body },
+    contactLink: { color: colors.accent, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
+    rosterRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    rosterName: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    rosterAdd: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: fonts.body },
+  });
+}
