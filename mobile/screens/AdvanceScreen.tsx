@@ -7,8 +7,11 @@
  *
  * `advances` is a trigger-bearing table (completion-lock), so writes
  * follow the newId()-and-no-.select() convention from lib/ids.ts.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -17,9 +20,11 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import { formatDepartment } from '../lib/format';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Advance'>;
+type Styles = ReturnType<typeof createStyles>;
 
 type Status = 'not_started' | 'in_progress' | 'confirmed';
 const STATUSES: { value: Status; label: string }[] = [
@@ -36,6 +41,8 @@ type Visibility = 'department' | 'org' | 'specific';
 export function AdvanceScreen({ route, navigation }: Props) {
   const { tourId, tourDateId, tourDateLabel } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [advanceId, setAdvanceId] = useState<string | null>(null);
   const [department, setDepartment] = useState('production');
@@ -134,7 +141,7 @@ export function AdvanceScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -198,28 +205,40 @@ export function AdvanceScreen({ route, navigation }: Props) {
           <Text style={styles.visibilityHint}>Save once first, then come back here to pick specific people or departments.</Text>
         ))}
 
-      <Section label="Power" value={powerNotes} onChange={setPowerNotes} />
-      <Section label="Hospitality" value={hospitalityNotes} onChange={setHospitalityNotes} />
-      <Section label="Schedule" value={scheduleNotes} onChange={setScheduleNotes} />
-      <Section label="Parking" value={parkingNotes} onChange={setParkingNotes} />
-      <Section label="Security" value={securityNotes} onChange={setSecurityNotes} />
-      <Section label="Other" value={otherNotes} onChange={setOtherNotes} />
+      <Section styles={styles} colors={colors} label="Power" value={powerNotes} onChange={setPowerNotes} />
+      <Section styles={styles} colors={colors} label="Hospitality" value={hospitalityNotes} onChange={setHospitalityNotes} />
+      <Section styles={styles} colors={colors} label="Schedule" value={scheduleNotes} onChange={setScheduleNotes} />
+      <Section styles={styles} colors={colors} label="Parking" value={parkingNotes} onChange={setParkingNotes} />
+      <Section styles={styles} colors={colors} label="Security" value={securityNotes} onChange={setSecurityNotes} />
+      <Section styles={styles} colors={colors} label="Other" value={otherNotes} onChange={setOtherNotes} />
 
       <Pressable style={styles.saveButton} onPress={handleSave} disabled={saving}>
-        {saving ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save Advance</Text>}
+        {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save Advance</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-function Section({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Section({
+  label,
+  value,
+  onChange,
+  styles,
+  colors,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  styles: Styles;
+  colors: ThemeColors;
+}) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{label}</Text>
       <TextInput
         style={styles.textArea}
         placeholder={`${label} details…`}
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={value}
         onChangeText={onChange}
         multiline
@@ -228,45 +247,52 @@ function Section({ label, value, onChange }: { label: string; value: string; onC
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 14, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#1a1a20', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  visibilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  visibilityRowSelected: { backgroundColor: '#2a2a3a' },
-  visibilityText: { color: '#fff', fontSize: 14 },
-  check: { color: '#7c9cff', fontSize: 14, fontWeight: '700' },
-  visibilityHint: { color: '#6b6b76', fontSize: 12, marginTop: -2, marginBottom: 8, fontStyle: 'italic' },
-  shareLinkButton: { paddingVertical: 6, marginBottom: 8 },
-  shareLinkButtonText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  section: { marginTop: 4 },
-  textArea: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    visibilityRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    visibilityRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+    visibilityText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    check: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
+    visibilityHint: { color: colors.textFaint, fontSize: 12, marginTop: -2, marginBottom: 8, fontStyle: 'italic', fontFamily: fonts.body },
+    shareLinkButton: { paddingVertical: 6, marginBottom: 8 },
+    shareLinkButtonText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    section: { marginTop: 4 },
+    textArea: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      minHeight: 70,
+      textAlignVertical: 'top',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+    saveButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

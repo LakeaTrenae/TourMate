@@ -3,8 +3,11 @@
  * hospitality & rider notes, load-in, whatever). Items get added
  * afterward on ChecklistDetailScreen, not here — keeping creation to
  * "title + who owns it + who can see it" keeps this form short.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -15,6 +18,7 @@ import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { formatDepartment } from '../lib/format';
 import { logAuditEvent } from '../lib/auditLog';
 import { notify } from '../lib/notify';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddChecklist'>;
@@ -68,6 +72,8 @@ const TEMPLATES: { label: string; title: string; department: string; items: stri
 export function AddChecklistScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [title, setTitle] = useState('');
   const [department, setDepartment] = useState('production');
@@ -219,7 +225,7 @@ export function AddChecklistScreen({ route, navigation }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Checklist title"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={title}
         onChangeText={setTitle}
       />
@@ -300,72 +306,79 @@ export function AddChecklistScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Create Checklist</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Create Checklist</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 14, marginBottom: 8 },
-  templateHint: { color: '#6b6b76', fontSize: 12, marginTop: -4, marginBottom: 4 },
-  templateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  templateChip: {
-    backgroundColor: '#15151a',
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  templateChipText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 4,
-    fontSize: 15,
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#1a1a20', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  visibilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  visibilityRowSelected: { backgroundColor: '#2a2a3a' },
-  visibilityText: { color: '#fff', fontSize: 14 },
-  check: { color: '#7c9cff', fontSize: 14, fontWeight: '700' },
-  shareBox: { backgroundColor: '#15151a', borderRadius: 10, padding: 14, marginBottom: 6 },
-  shareBoxLabel: { color: '#9a9aa5', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
-  shareBoxLabelSpaced: { marginTop: 14 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: '#6b6b76',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  checkboxChecked: { backgroundColor: '#7c9cff', borderColor: '#7c9cff' },
-  checkmark: { color: '#0b0b0f', fontSize: 12, fontWeight: '700' },
-  checkboxLabel: { color: '#fff', fontSize: 14 },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 12 },
-  submitButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
+    templateHint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, fontFamily: fonts.body },
+    templateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    templateChip: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    templateChipText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginTop: 4,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    visibilityRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    visibilityRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+    visibilityText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    check: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
+    shareBox: { backgroundColor: colors.surface2, borderRadius: 10, padding: 14, marginBottom: 6 },
+    shareBoxLabel: { color: colors.textDim, fontSize: 11, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    shareBoxLabelSpaced: { marginTop: 14 },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+      borderWidth: 2,
+      borderColor: colors.textFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
+    checkmark: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bodyBold },
+    checkboxLabel: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginTop: 12, fontFamily: fonts.body },
+    submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}
