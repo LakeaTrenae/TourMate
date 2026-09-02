@@ -8,8 +8,13 @@
  * or App Store review rejects the submission. The actual deletion runs
  * server-side (supabase/functions/delete-account) — this screen is just
  * the confirmation UI and the call site.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx. This screen also owns the Appearance
+ * section (System/Light/Dark) that drives useTheme() for the rest of the
+ * converted screens.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,7 +35,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { registerForPushNotifications } from '../lib/pushNotifications';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
-import { useTheme, type ThemePreference } from '../lib/theme';
+import { useTheme, fonts, type ThemeColors, type ThemePreference } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
@@ -40,7 +45,8 @@ type EnrollData = { factorId: string; secret: string; uri: string };
 
 export function SettingsScreen({ navigation }: Props) {
   const { session, profile, refreshProfile, signOut, refreshMfaStatus } = useAuth();
-  const { preference, setPreference } = useTheme();
+  const { colors, preference, setPreference } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [preferredName, setPreferredName] = useState(profile?.preferred_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -275,7 +281,7 @@ export function SettingsScreen({ navigation }: Props) {
           )}
           {uploadingAvatar && (
             <View style={styles.avatarOverlay}>
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.text} />
             </View>
           )}
         </Pressable>
@@ -288,7 +294,7 @@ export function SettingsScreen({ navigation }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Preferred name"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={preferredName}
         onChangeText={setPreferredName}
         autoCapitalize="words"
@@ -296,7 +302,7 @@ export function SettingsScreen({ navigation }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Phone"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
@@ -311,7 +317,7 @@ export function SettingsScreen({ navigation }: Props) {
       </View>
 
       <Pressable style={styles.saveButton} onPress={handleSaveProfile} disabled={savingProfile}>
-        {savingProfile ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save Profile</Text>}
+        {savingProfile ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save Profile</Text>}
       </Pressable>
 
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Organizations</Text>
@@ -348,7 +354,7 @@ export function SettingsScreen({ navigation }: Props) {
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Notifications</Text>
       <Pressable style={styles.travelDocsRow} onPress={handleEnablePush} disabled={registeringPush}>
         {registeringPush ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.text} />
         ) : (
           <Text style={styles.travelDocsText}>Enable Push Notifications</Text>
         )}
@@ -370,7 +376,7 @@ export function SettingsScreen({ navigation }: Props) {
           <TextInput
             style={styles.input}
             placeholder="Enter the 6-digit code to confirm"
-            placeholderTextColor="#6b6b76"
+            placeholderTextColor={colors.textFaint}
             value={enrollCode}
             onChangeText={setEnrollCode}
             keyboardType="number-pad"
@@ -378,7 +384,7 @@ export function SettingsScreen({ navigation }: Props) {
           />
           <View style={styles.mfaSetupActions}>
             <Pressable style={[styles.saveButton, styles.mfaConfirmButton]} onPress={handleConfirmEnroll} disabled={mfaBusy}>
-              {mfaBusy ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Confirm</Text>}
+              {mfaBusy ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Confirm</Text>}
             </Pressable>
             <Pressable style={styles.cancelEnrollButton} onPress={cancelEnroll} disabled={mfaBusy}>
               <Text style={styles.cancelEnrollButtonText}>Cancel</Text>
@@ -389,12 +395,12 @@ export function SettingsScreen({ navigation }: Props) {
         <View style={styles.travelDocsRow}>
           <Text style={styles.travelDocsText}>Two-factor authentication is on</Text>
           <Pressable onPress={confirmDisableMfa} disabled={mfaBusy}>
-            {mfaBusy ? <ActivityIndicator color="#ff6b6b" /> : <Text style={styles.mfaDisableText}>Turn off</Text>}
+            {mfaBusy ? <ActivityIndicator color={colors.danger} /> : <Text style={styles.mfaDisableText}>Turn off</Text>}
           </Pressable>
         </View>
       ) : (
         <Pressable style={styles.travelDocsRow} onPress={handleStartEnroll} disabled={mfaBusy}>
-          {mfaBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.travelDocsText}>Enable Two-Factor Authentication</Text>}
+          {mfaBusy ? <ActivityIndicator color={colors.text} /> : <Text style={styles.travelDocsText}>Enable Two-Factor Authentication</Text>}
         </Pressable>
       )}
 
@@ -430,97 +436,108 @@ export function SettingsScreen({ navigation }: Props) {
       <View style={styles.dangerZone}>
         <Text style={styles.dangerTitle}>Danger Zone</Text>
         <Pressable style={styles.deleteButton} onPress={confirmDeleteAccount} disabled={deleting}>
-          {deleting ? <ActivityIndicator color="#ff6b6b" /> : <Text style={styles.deleteButtonText}>Delete Account</Text>}
+          {deleting ? <ActivityIndicator color={colors.danger} /> : <Text style={styles.deleteButtonText}>Delete Account</Text>}
         </Pressable>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  avatarSection: { alignItems: 'center', marginBottom: 24 },
-  avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#1a1a20' },
-  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  avatarPlaceholderText: { color: '#6b6b76', fontSize: 32, fontWeight: '700' },
-  avatarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 44,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  changePhotoText: { color: '#7c9cff', fontSize: 13, fontWeight: '600', marginTop: 10, textAlign: 'center' },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
-  sectionTitleSpaced: { marginTop: 24 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  readOnlyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
-  readOnlyLabel: { color: '#6b6b76', fontSize: 13 },
-  readOnlyValue: { color: '#9a9aa5', fontSize: 13 },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 15, fontWeight: '600' },
-  emptyText: { color: '#6b6b76', fontSize: 13 },
-  orgRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-  },
-  orgName: { color: '#fff', fontSize: 14 },
-  orgRole: { color: '#6b6b76', fontSize: 12 },
-  orgAction: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  travelDocsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 12,
-  },
-  travelDocsText: { color: '#fff', fontSize: 14 },
-  themeRow: { flexDirection: 'row', gap: 8 },
-  themeOption: {
-    flex: 1,
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  themeOptionActive: { backgroundColor: '#fff' },
-  themeOptionText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
-  themeOptionTextActive: { color: '#0b0b0f' },
-  pushStatus: { color: '#7ee787', fontSize: 12, marginTop: 6, marginBottom: 6 },
-  mfaSetupBox: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14 },
-  mfaSetupLabel: { color: '#9a9aa5', fontSize: 12, marginBottom: 8 },
-  mfaSecret: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
-  mfaUri: { color: '#6b6b76', fontSize: 11, marginBottom: 12 },
-  mfaSetupActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  mfaConfirmButton: { flex: 1, marginTop: 0 },
-  cancelEnrollButton: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-  cancelEnrollButtonText: { color: '#9a9aa5', fontSize: 14, fontWeight: '600' },
-  mfaDisableText: { color: '#ff6b6b', fontSize: 13, fontWeight: '600' },
-  signOutButton: { alignItems: 'center', paddingVertical: 14, marginTop: 28 },
-  signOutButtonText: { color: '#9a9aa5', fontSize: 15, fontWeight: '600' },
-  dangerZone: { marginTop: 20, borderTopWidth: 1, borderTopColor: '#2a2a32', paddingTop: 20 },
-  dangerTitle: { color: '#6b6b76', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10 },
-  deleteButton: { alignItems: 'center', paddingVertical: 12 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 14, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4, marginBottom: 16 },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    avatarSection: { alignItems: 'center', marginBottom: 24 },
+    avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surface },
+    avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+    avatarPlaceholderText: { color: colors.textFaint, fontSize: 32, fontFamily: fonts.displayBold },
+    avatarOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: 44,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    changePhotoText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold, marginTop: 10, textAlign: 'center' },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    sectionTitleSpaced: { marginTop: 24 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    readOnlyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
+    readOnlyLabel: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    readOnlyValue: { color: colors.textDim, fontSize: 13, fontFamily: fonts.body },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
+    saveButtonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bodySemiBold },
+    emptyText: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    orgRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    orgName: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    orgRole: { color: colors.textFaint, fontSize: 12, fontFamily: fonts.body },
+    orgAction: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    travelDocsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    travelDocsText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    themeRow: { flexDirection: 'row', gap: 8 },
+    themeOption: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    themeOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+    themeOptionText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    themeOptionTextActive: { color: colors.onAccent },
+    pushStatus: { color: colors.success, fontSize: 12, marginTop: 6, marginBottom: 6, fontFamily: fonts.body },
+    mfaSetupBox: { backgroundColor: colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: colors.border },
+    mfaSetupLabel: { color: colors.textDim, fontSize: 12, marginBottom: 8, fontFamily: fonts.body },
+    mfaSecret: { color: colors.text, fontSize: 16, fontFamily: fonts.monoMedium, letterSpacing: 1, marginBottom: 6 },
+    mfaUri: { color: colors.textFaint, fontSize: 11, marginBottom: 12, fontFamily: fonts.mono },
+    mfaSetupActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    mfaConfirmButton: { flex: 1, marginTop: 0 },
+    cancelEnrollButton: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+    cancelEnrollButtonText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    mfaDisableText: { color: colors.danger, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    signOutButton: { alignItems: 'center', paddingVertical: 14, marginTop: 28 },
+    signOutButtonText: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold },
+    dangerZone: { marginTop: 20, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 20 },
+    dangerTitle: { color: colors.textFaint, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+    deleteButton: { alignItems: 'center', paddingVertical: 12 },
+    deleteButtonText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bodySemiBold },
+  });
+}
