@@ -9,8 +9,11 @@
  * server-side. Duplicating that logic client-side would be redundant at
  * best and give a false sense of security at worst (client-side checks
  * are always bypassable).
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -25,11 +28,14 @@ import {
 
 import { useAuth } from '../lib/auth-context';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot';
 
 export function AuthScreen() {
   const { signInWithPassword, signUp, requestPasswordReset } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [mode, setMode] = useState<Mode>('sign-in');
   const [firstName, setFirstName] = useState('');
@@ -106,7 +112,7 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="First name"
-            placeholderTextColor="#6b6b76"
+            placeholderTextColor={colors.textFaint}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -115,7 +121,7 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="Last name"
-            placeholderTextColor="#6b6b76"
+            placeholderTextColor={colors.textFaint}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -138,7 +144,7 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#6b6b76"
+            placeholderTextColor={colors.textFaint}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -150,7 +156,7 @@ export function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
-              placeholderTextColor="#6b6b76"
+              placeholderTextColor={colors.textFaint}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -162,7 +168,7 @@ export function AuthScreen() {
 
           <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
             {submitting ? (
-              <ActivityIndicator color="#0b0b0f" />
+              <ActivityIndicator color={colors.onAccent} />
             ) : (
               <Text style={styles.submitButtonText}>
                 {isForgot ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in'}
@@ -209,81 +215,93 @@ export function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#9a9aa5',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 32,
-  },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  hint: {
-    color: '#6b6b76',
-    fontSize: 12,
-    marginBottom: 12,
-    marginTop: -4,
-    lineHeight: 18,
-  },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  submitButtonText: {
-    color: '#0b0b0f',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  toggleText: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  agreementText: {
-    color: '#6b6b76',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: -12,
-    marginBottom: 16,
-    lineHeight: 17,
-  },
-  agreementLink: {
-    color: '#7c9cff',
-  },
-  toggleTextSecondary: {
-    color: '#6b6b76',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 10,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 34,
+      fontFamily: fonts.displayBlack,
+      textAlign: 'center',
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      color: colors.textDim,
+      fontSize: 14,
+      textAlign: 'center',
+      marginTop: 6,
+      marginBottom: 32,
+      fontFamily: fonts.body,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+      fontSize: 16,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginBottom: 12,
+      fontFamily: fonts.body,
+    },
+    hint: {
+      color: colors.textFaint,
+      fontSize: 12,
+      marginBottom: 12,
+      marginTop: -4,
+      lineHeight: 18,
+      fontFamily: fonts.body,
+    },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    submitButtonText: {
+      color: colors.onAccent,
+      fontSize: 16,
+      fontFamily: fonts.bodySemiBold,
+    },
+    toggleText: {
+      color: colors.textDim,
+      fontSize: 13,
+      textAlign: 'center',
+      marginTop: 4,
+      fontFamily: fonts.body,
+    },
+    agreementText: {
+      color: colors.textFaint,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: -12,
+      marginBottom: 16,
+      lineHeight: 17,
+      fontFamily: fonts.body,
+    },
+    agreementLink: {
+      color: colors.accent,
+    },
+    toggleTextSecondary: {
+      color: colors.textFaint,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 10,
+      fontFamily: fonts.body,
+    },
+  });
+}

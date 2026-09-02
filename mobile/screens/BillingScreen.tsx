@@ -18,8 +18,11 @@
  * password-recovery flow); this screen listens for that and re-fetches
  * status a few times over ~5s, since webhook delivery lands slightly
  * after the browser redirect, not before it.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +30,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, Vi
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Billing'>;
@@ -42,6 +46,8 @@ type OrgBilling = {
 export function BillingScreen({ route }: Props) {
   const { organizationId, organizationName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [org, setOrg] = useState<OrgBilling | null>(null);
   const [seatCount, setSeatCount] = useState<number | null>(null);
@@ -174,7 +180,7 @@ export function BillingScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -204,7 +210,7 @@ export function BillingScreen({ route }: Props) {
               <Text style={styles.planName}>Monthly</Text>
               <Text style={styles.planPrice}>$39.99 / seat / month</Text>
             </View>
-            {subscribing === 'monthly' && <ActivityIndicator color="#fff" />}
+            {subscribing === 'monthly' && <ActivityIndicator color={colors.text} />}
           </Pressable>
           <Pressable
             style={styles.planCard}
@@ -215,7 +221,7 @@ export function BillingScreen({ route }: Props) {
               <Text style={styles.planName}>Annual</Text>
               <Text style={styles.planPrice}>$34.99 / seat / month — billed $419.88/yr</Text>
             </View>
-            {subscribing === 'annual' && <ActivityIndicator color="#fff" />}
+            {subscribing === 'annual' && <ActivityIndicator color={colors.text} />}
           </Pressable>
           <Text style={styles.agreementText}>
             By subscribing you agree to our{' '}
@@ -233,14 +239,14 @@ export function BillingScreen({ route }: Props) {
             <>
               <Pressable style={styles.secondaryButton} onPress={handleManageBilling} disabled={managingBilling}>
                 {managingBilling ? (
-                  <ActivityIndicator color="#7c9cff" />
+                  <ActivityIndicator color={colors.accent} />
                 ) : (
                   <Text style={styles.secondaryButtonText}>Manage Billing</Text>
                 )}
               </Pressable>
               <Pressable style={styles.secondaryButton} onPress={handleSyncSeats} disabled={syncingSeats}>
                 {syncingSeats ? (
-                  <ActivityIndicator color="#7c9cff" />
+                  <ActivityIndicator color={colors.accent} />
                 ) : (
                   <Text style={styles.secondaryButtonText}>Sync Seats</Text>
                 )}
@@ -257,39 +263,43 @@ export function BillingScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  statusMessage: { color: '#7c9cff', fontSize: 13, marginBottom: 12 },
-  statusCard: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 20 },
-  statusLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  seatLabel: { color: '#9a9aa5', fontSize: 13, marginTop: 4 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
-  planCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 8,
-  },
-  planName: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  planPrice: { color: '#9a9aa5', fontSize: 13, marginTop: 2 },
-  agreementText: { color: '#6b6b76', fontSize: 12, marginTop: 4, marginBottom: 20, lineHeight: 17 },
-  link: { color: '#7c9cff' },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  secondaryButtonText: { color: '#7c9cff', fontSize: 14, fontWeight: '600' },
-  nonAdminHint: { color: '#9a9aa5', fontSize: 14, lineHeight: 20 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    statusMessage: { color: colors.accent, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    statusCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 20 },
+    statusLabel: { color: colors.text, fontSize: 16, fontFamily: fonts.displaySemiBold },
+    seatLabel: { color: colors.textDim, fontSize: 13, marginTop: 4, fontFamily: fonts.mono },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    planCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 16,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    planName: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold },
+    planPrice: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.mono },
+    agreementText: { color: colors.textFaint, fontSize: 12, marginTop: 4, marginBottom: 20, lineHeight: 17, fontFamily: fonts.body },
+    link: { color: colors.accent },
+    secondaryButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    secondaryButtonText: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    nonAdminHint: { color: colors.textDim, fontSize: 14, lineHeight: 20, fontFamily: fonts.body },
+  });
+}
