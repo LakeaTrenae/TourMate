@@ -14,8 +14,11 @@
  *
  * Manager-only via UI convenience; "tour_dates writable by managers" RLS
  * (0001_init.sql) is what actually enforces it.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -30,6 +33,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { parseOptionalNumber } from '../lib/numbers';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddTourDate'>;
@@ -45,6 +49,8 @@ const SHOW_STATUSES: { value: ShowStatus; label: string }[] = [
 
 export function AddTourDateScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -140,7 +146,7 @@ export function AddTourDateScreen({ route, navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Add Show Date</Text>
 
-      <TextInput style={styles.input} placeholder="Date — e.g. 2026-09-10" placeholderTextColor="#6b6b76" value={date} onChangeText={setDate} />
+      <TextInput style={styles.input} placeholder="Date — e.g. 2026-09-10" placeholderTextColor={colors.textFaint} value={date} onChangeText={setDate} />
 
       <Text style={styles.sectionTitle}>Venue</Text>
       <View style={styles.chipRow}>
@@ -175,76 +181,81 @@ export function AddTourDateScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Load-in (14:00)" placeholderTextColor="#6b6b76" value={loadIn} onChangeText={setLoadIn} />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Soundcheck (16:00)" placeholderTextColor="#6b6b76" value={soundcheck} onChangeText={setSoundcheck} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Load-in (14:00)" placeholderTextColor={colors.textFaint} value={loadIn} onChangeText={setLoadIn} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Soundcheck (16:00)" placeholderTextColor={colors.textFaint} value={soundcheck} onChangeText={setSoundcheck} />
       </View>
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Doors (19:00)" placeholderTextColor="#6b6b76" value={doors} onChangeText={setDoors} />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Set time (20:30)" placeholderTextColor="#6b6b76" value={setTime} onChangeText={setSetTime} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Doors (19:00)" placeholderTextColor={colors.textFaint} value={doors} onChangeText={setDoors} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Set time (20:30)" placeholderTextColor={colors.textFaint} value={setTime} onChangeText={setSetTime} />
       </View>
 
       <Text style={styles.sectionTitle}>Promoter</Text>
-      <TextInput style={styles.input} placeholder="Promoter name" placeholderTextColor="#6b6b76" value={promoterName} onChangeText={setPromoterName} />
+      <TextInput style={styles.input} placeholder="Promoter name" placeholderTextColor={colors.textFaint} value={promoterName} onChangeText={setPromoterName} />
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor="#6b6b76" value={promoterPhone} onChangeText={setPromoterPhone} keyboardType="phone-pad" />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Email" placeholderTextColor="#6b6b76" value={promoterEmail} onChangeText={setPromoterEmail} autoCapitalize="none" keyboardType="email-address" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor={colors.textFaint} value={promoterPhone} onChangeText={setPromoterPhone} keyboardType="phone-pad" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Email" placeholderTextColor={colors.textFaint} value={promoterEmail} onChangeText={setPromoterEmail} autoCapitalize="none" keyboardType="email-address" />
       </View>
 
       <Text style={styles.sectionTitle}>Deal</Text>
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Guarantee ($)" placeholderTextColor="#6b6b76" value={guarantee} onChangeText={setGuarantee} keyboardType="decimal-pad" />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Ticket price ($)" placeholderTextColor="#6b6b76" value={ticketPrice} onChangeText={setTicketPrice} keyboardType="decimal-pad" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Guarantee ($)" placeholderTextColor={colors.textFaint} value={guarantee} onChangeText={setGuarantee} keyboardType="decimal-pad" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Ticket price ($)" placeholderTextColor={colors.textFaint} value={ticketPrice} onChangeText={setTicketPrice} keyboardType="decimal-pad" />
       </View>
-      <TextInput style={styles.input} placeholder="Capacity override" placeholderTextColor="#6b6b76" value={capacityOverride} onChangeText={setCapacityOverride} keyboardType="number-pad" />
+      <TextInput style={styles.input} placeholder="Capacity override" placeholderTextColor={colors.textFaint} value={capacityOverride} onChangeText={setCapacityOverride} keyboardType="number-pad" />
 
-      <TextInput style={styles.input} placeholder="Notes" placeholderTextColor="#6b6b76" value={notes} onChangeText={setNotes} multiline />
+      <TextInput style={styles.input} placeholder="Notes" placeholderTextColor={colors.textFaint} value={notes} onChangeText={setNotes} multiline />
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Add Date</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Add Date</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 14, marginBottom: 8 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: { flexDirection: 'row', gap: 10 },
-  rowInput: { flex: 1 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip: { backgroundColor: '#1a1a20', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  newVenueChip: {
-    backgroundColor: '#15151a',
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  newVenueChipText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 8, marginBottom: 4 },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: { flexDirection: 'row', gap: 10 },
+    rowInput: { flex: 1 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+    chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    newVenueChip: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    newVenueChipText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4, fontFamily: fonts.body },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

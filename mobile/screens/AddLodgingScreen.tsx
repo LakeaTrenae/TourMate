@@ -6,8 +6,11 @@
  * "+ Hotel" button, but the real enforcement is server-side RLS
  * ("lodging writable by managers" etc, 0002_policy_gaps.sql) — this
  * screen's own logic isn't what's protecting the data.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -22,6 +25,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddLodging'>;
@@ -34,6 +38,8 @@ type DraftRoom = {
 
 export function AddLodgingScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [hotelName, setHotelName] = useState('');
@@ -143,25 +149,25 @@ export function AddLodgingScreen({ route, navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Add Hotel</Text>
 
-      <TextInput style={styles.input} placeholder="Hotel name" placeholderTextColor="#6b6b76" value={hotelName} onChangeText={setHotelName} />
-      <TextInput style={styles.input} placeholder="Address" placeholderTextColor="#6b6b76" value={address} onChangeText={setAddress} />
+      <TextInput style={styles.input} placeholder="Hotel name" placeholderTextColor={colors.textFaint} value={hotelName} onChangeText={setHotelName} />
+      <TextInput style={styles.input} placeholder="Address" placeholderTextColor={colors.textFaint} value={address} onChangeText={setAddress} />
       <View style={styles.row}>
         <TextInput
           style={[styles.input, styles.rowInput]}
           placeholder="Check-in (2026-09-10)"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={checkIn}
           onChangeText={setCheckIn}
         />
         <TextInput
           style={[styles.input, styles.rowInput]}
           placeholder="Check-out (2026-09-12)"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={checkOut}
           onChangeText={setCheckOut}
         />
       </View>
-      <TextInput style={styles.input} placeholder="Confirmation code" placeholderTextColor="#6b6b76" value={confirmationCode} onChangeText={setConfirmationCode} autoCapitalize="characters" />
+      <TextInput style={styles.input} placeholder="Confirmation code" placeholderTextColor={colors.textFaint} value={confirmationCode} onChangeText={setConfirmationCode} autoCapitalize="characters" />
 
       <Text style={styles.sectionTitle}>Rooms</Text>
       {rooms.map((room, index) => (
@@ -170,7 +176,7 @@ export function AddLodgingScreen({ route, navigation }: Props) {
             <TextInput
               style={[styles.input, styles.roomNumberInput]}
               placeholder={`Room ${index + 1} number`}
-              placeholderTextColor="#6b6b76"
+              placeholderTextColor={colors.textFaint}
               value={room.roomNumber}
               onChangeText={(v) => updateRoomNumber(room.key, v)}
             />
@@ -203,7 +209,7 @@ export function AddLodgingScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Add Hotel</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Add Hotel</Text>}
       </Pressable>
     </ScrollView>
   );
@@ -216,112 +222,124 @@ function cryptoRandomKey() {
   return Math.random().toString(36).slice(2);
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 60,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  rowInput: {
-    flex: 1,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  roomBlock: {
-    backgroundColor: '#15151a',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-  },
-  roomBlockHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  roomNumberInput: {
-    flex: 1,
-    marginBottom: 8,
-  },
-  removeButton: {
-    marginBottom: 8,
-  },
-  removeButtonText: {
-    color: '#ff6b6b',
-    fontSize: 13,
-  },
-  rosterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  rosterRowSelected: {
-    backgroundColor: '#2a2a3a',
-  },
-  rosterName: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  rosterCheck: {
-    color: '#7c9cff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  addRoomButton: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  addRoomButtonText: {
-    color: '#9a9aa5',
-    fontSize: 13,
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  submitButtonText: {
-    color: '#0b0b0f',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    content: {
+      padding: 20,
+      paddingBottom: 60,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 22,
+      fontFamily: fonts.displayBold,
+      marginBottom: 16,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    rowInput: {
+      flex: 1,
+    },
+    sectionTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontFamily: fonts.bodySemiBold,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    roomBlock: {
+      backgroundColor: colors.surface2,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 10,
+    },
+    roomBlockHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    roomNumberInput: {
+      flex: 1,
+      marginBottom: 8,
+    },
+    removeButton: {
+      marginBottom: 8,
+    },
+    removeButtonText: {
+      color: colors.danger,
+      fontSize: 13,
+      fontFamily: fonts.body,
+    },
+    rosterRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    rosterRowSelected: {
+      backgroundColor: colors.accentSoft,
+      borderColor: colors.accent,
+    },
+    rosterName: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: fonts.body,
+    },
+    rosterCheck: {
+      color: colors.accent,
+      fontSize: 14,
+      fontFamily: fonts.bodyBold,
+    },
+    addRoomButton: {
+      alignItems: 'center',
+      paddingVertical: 10,
+      marginBottom: 8,
+    },
+    addRoomButtonText: {
+      color: colors.textDim,
+      fontSize: 13,
+      fontFamily: fonts.body,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginTop: 8,
+      marginBottom: 4,
+      fontFamily: fonts.body,
+    },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    submitButtonText: {
+      color: colors.onAccent,
+      fontSize: 16,
+      fontFamily: fonts.bodySemiBold,
+    },
+  });
+}

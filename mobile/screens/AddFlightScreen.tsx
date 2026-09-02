@@ -6,8 +6,11 @@
  * writable by managers" / "flight_passengers writable by managers" RLS
  * policies: if a crew member somehow landed on this screen and hit
  * submit, the insert would just fail server-side.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -22,12 +25,15 @@ import {
 import { supabase } from '../lib/supabase';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddFlight'>;
 
 export function AddFlightScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [selectedPassengers, setSelectedPassengers] = useState<Set<string>>(new Set());
@@ -117,15 +123,15 @@ export function AddFlightScreen({ route, navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Add Flight</Text>
 
-      <TextInput style={styles.input} placeholder="Airline" placeholderTextColor="#6b6b76" value={airline} onChangeText={setAirline} />
-      <TextInput style={styles.input} placeholder="Flight number" placeholderTextColor="#6b6b76" value={flightNumber} onChangeText={setFlightNumber} autoCapitalize="characters" />
-      <TextInput style={styles.input} placeholder="Confirmation code" placeholderTextColor="#6b6b76" value={confirmationCode} onChangeText={setConfirmationCode} autoCapitalize="characters" />
+      <TextInput style={styles.input} placeholder="Airline" placeholderTextColor={colors.textFaint} value={airline} onChangeText={setAirline} />
+      <TextInput style={styles.input} placeholder="Flight number" placeholderTextColor={colors.textFaint} value={flightNumber} onChangeText={setFlightNumber} autoCapitalize="characters" />
+      <TextInput style={styles.input} placeholder="Confirmation code" placeholderTextColor={colors.textFaint} value={confirmationCode} onChangeText={setConfirmationCode} autoCapitalize="characters" />
 
       <View style={styles.row}>
         <TextInput
           style={[styles.input, styles.rowInput]}
           placeholder="Departure airport (JFK)"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={departureAirport}
           onChangeText={setDepartureAirport}
           autoCapitalize="characters"
@@ -134,7 +140,7 @@ export function AddFlightScreen({ route, navigation }: Props) {
         <TextInput
           style={[styles.input, styles.rowInput]}
           placeholder="Arrival airport (LAX)"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={arrivalAirport}
           onChangeText={setArrivalAirport}
           autoCapitalize="characters"
@@ -145,14 +151,14 @@ export function AddFlightScreen({ route, navigation }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Departure — e.g. 2026-09-10 14:30"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={departureTime}
         onChangeText={setDepartureTime}
       />
       <TextInput
         style={styles.input}
         placeholder="Arrival — e.g. 2026-09-10 17:45"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={arrivalTime}
         onChangeText={setArrivalTime}
       />
@@ -176,91 +182,102 @@ export function AddFlightScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Add Flight</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Add Flight</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 60,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  rowInput: {
-    flex: 1,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: '#6b6b76',
-    fontSize: 13,
-  },
-  rosterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 6,
-  },
-  rosterRowSelected: {
-    backgroundColor: '#2a2a3a',
-  },
-  rosterName: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  rosterCheck: {
-    color: '#7c9cff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  submitButtonText: {
-    color: '#0b0b0f',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    content: {
+      padding: 20,
+      paddingBottom: 60,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 22,
+      fontFamily: fonts.displayBold,
+      marginBottom: 16,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    rowInput: {
+      flex: 1,
+    },
+    sectionTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontFamily: fonts.bodySemiBold,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    emptyText: {
+      color: colors.textFaint,
+      fontSize: 13,
+      fontFamily: fonts.body,
+    },
+    rosterRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    rosterRowSelected: {
+      backgroundColor: colors.accentSoft,
+      borderColor: colors.accent,
+    },
+    rosterName: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: fonts.body,
+    },
+    rosterCheck: {
+      color: colors.accent,
+      fontSize: 14,
+      fontFamily: fonts.bodyBold,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginTop: 8,
+      marginBottom: 4,
+      fontFamily: fonts.body,
+    },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    submitButtonText: {
+      color: colors.onAccent,
+      fontSize: 16,
+      fontFamily: fonts.bodySemiBold,
+    },
+  });
+}
