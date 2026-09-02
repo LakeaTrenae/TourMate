@@ -5,8 +5,11 @@
  * as ShowDetailScreen's single-day print — no manager gate, since the
  * single-day version isn't gated either (promoter/schedule info visible
  * there is already visible to whoever can open that date's detail screen).
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,6 +18,7 @@ import * as Print from 'expo-print';
 import { supabase } from '../lib/supabase';
 import { formatDateOnly } from '../lib/dates';
 import { buildTourExportHtml, type DaySheetData } from '../lib/dayPrint';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TourExport'>;
@@ -35,6 +39,8 @@ type TourDateRow = {
 
 export function TourExportScreen({ route }: Props) {
   const { tourId, tourName } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [dateCount, setDateCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +108,7 @@ export function TourExportScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -121,19 +127,21 @@ export function TourExportScreen({ route }: Props) {
       </Text>
 
       <Pressable style={styles.exportButton} onPress={handleExport} disabled={printing || dateCount === 0}>
-        {printing ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.exportButtonText}>Export Full Tour Sheet</Text>}
+        {printing ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.exportButtonText}>Export Full Tour Sheet</Text>}
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2, marginBottom: 20 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  description: { color: '#9a9aa5', fontSize: 14, lineHeight: 20, marginBottom: 24 },
-  exportButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  exportButtonText: { color: '#0b0b0f', fontSize: 15, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, marginBottom: 20, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    description: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginBottom: 24, fontFamily: fonts.body },
+    exportButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+    exportButtonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bodySemiBold },
+  });
+}

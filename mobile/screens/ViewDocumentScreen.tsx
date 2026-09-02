@@ -15,20 +15,26 @@
  * available as a real fallback, not just an error-state escape hatch,
  * since a broken Android render can show up as a blank view rather than
  * a caught error.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { supabase } from '../lib/supabase';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ViewDocument'>;
 
 export function ViewDocumentScreen({ route }: Props) {
   const { bucket, storagePath, title } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +73,7 @@ export function ViewDocumentScreen({ route }: Props) {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : errorMessage ? (
         <View style={styles.centered}>
@@ -76,7 +82,7 @@ export function ViewDocumentScreen({ route }: Props) {
       ) : signedUrl ? (
         <WebView source={{ uri: signedUrl }} style={styles.webview} startInLoadingState renderLoading={() => (
           <View style={styles.centered}>
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.accent} />
           </View>
         )} />
       ) : null}
@@ -84,20 +90,22 @@ export function ViewDocumentScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a32',
-  },
-  title: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, marginRight: 12 },
-  externalLink: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  error: { color: '#ff6b6b', fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
-  webview: { flex: 1, backgroundColor: '#0b0b0f' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    title: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold, flex: 1, marginRight: 12 },
+    externalLink: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 14, textAlign: 'center', paddingHorizontal: 24, fontFamily: fonts.body },
+    webview: { flex: 1, backgroundColor: colors.bg },
+  });
+}

@@ -5,8 +5,11 @@
  * before a tour can. Whoever creates it automatically becomes its
  * `owner` — see the `handle_new_organization` trigger in
  * 0008_org_creation_and_existing_user_invites.sql.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -20,12 +23,15 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateOrganization'>;
 
 export function CreateOrganizationScreen({ navigation }: Props) {
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -70,7 +76,7 @@ export function CreateOrganizationScreen({ navigation }: Props) {
       <TextInput
         style={styles.input}
         placeholder="e.g. Jhené Aiko Touring"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
@@ -80,26 +86,31 @@ export function CreateOrganizationScreen({ navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Continue</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Continue</Text>}
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', justifyContent: 'center', paddingHorizontal: 24 },
-  title: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
-  subtitle: { color: '#9a9aa5', fontSize: 14, textAlign: 'center', marginTop: 10, marginBottom: 28, lineHeight: 20 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  submitButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 24 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: 10, marginBottom: 28, lineHeight: 20, fontFamily: fonts.body },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 16,
+      fontSize: 16,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}
