@@ -17,8 +17,11 @@
  * nowhere to put venue/city data and just concatenated it into the notes
  * field — now that tour_dates.venue_id (0001) has a real UI via
  * AddTourDateScreen/VenuesScreen, that workaround is gone.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -34,9 +37,11 @@ import {
 import { supabase } from '../lib/supabase';
 import { readFileAsBase64 } from '../lib/files';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ImportSchedule'>;
+type Styles = ReturnType<typeof createStyles>;
 
 type ExtractedShow = {
   key: string; // local-only, for list rendering/editing — never sent to the DB
@@ -63,6 +68,8 @@ type RawShow = {
 
 export function ImportScheduleScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [phase, setPhase] = useState<'idle' | 'extracting' | 'review' | 'importing'>('idle');
   const [fileName, setFileName] = useState<string | null>(null);
@@ -227,7 +234,7 @@ export function ImportScheduleScreen({ route, navigation }: Props) {
   if (phase === 'extracting') {
     return (
       <View style={styles.centeredContainer}>
-        <ActivityIndicator color="#fff" size="large" />
+        <ActivityIndicator color={colors.accent} size="large" />
         <Text style={styles.subtitle}>Reading {fileName}…</Text>
       </View>
     );
@@ -252,24 +259,24 @@ export function ImportScheduleScreen({ route, navigation }: Props) {
             </Pressable>
           </View>
 
-          <Field label="Date (YYYY-MM-DD)" value={show.date} onChange={(v) => updateShow(show.key, 'date', v)} />
-          <Field label="Venue" value={show.venue_name} onChange={(v) => updateShow(show.key, 'venue_name', v)} />
-          <Field label="City" value={show.city} onChange={(v) => updateShow(show.key, 'city', v)} />
+          <Field styles={styles} colors={colors} label="Date (YYYY-MM-DD)" value={show.date} onChange={(v) => updateShow(show.key, 'date', v)} />
+          <Field styles={styles} colors={colors} label="Venue" value={show.venue_name} onChange={(v) => updateShow(show.key, 'venue_name', v)} />
+          <Field styles={styles} colors={colors} label="City" value={show.city} onChange={(v) => updateShow(show.key, 'city', v)} />
           <View style={styles.row}>
-            <Field label="Load-in" value={show.load_in} onChange={(v) => updateShow(show.key, 'load_in', v)} flex />
-            <Field label="Soundcheck" value={show.soundcheck} onChange={(v) => updateShow(show.key, 'soundcheck', v)} flex />
+            <Field styles={styles} colors={colors} label="Load-in" value={show.load_in} onChange={(v) => updateShow(show.key, 'load_in', v)} flex />
+            <Field styles={styles} colors={colors} label="Soundcheck" value={show.soundcheck} onChange={(v) => updateShow(show.key, 'soundcheck', v)} flex />
           </View>
           <View style={styles.row}>
-            <Field label="Doors" value={show.doors} onChange={(v) => updateShow(show.key, 'doors', v)} flex />
-            <Field label="Set time" value={show.set_time} onChange={(v) => updateShow(show.key, 'set_time', v)} flex />
+            <Field styles={styles} colors={colors} label="Doors" value={show.doors} onChange={(v) => updateShow(show.key, 'doors', v)} flex />
+            <Field styles={styles} colors={colors} label="Set time" value={show.set_time} onChange={(v) => updateShow(show.key, 'set_time', v)} flex />
           </View>
-          <Field label="Notes" value={show.notes} onChange={(v) => updateShow(show.key, 'notes', v)} />
+          <Field styles={styles} colors={colors} label="Notes" value={show.notes} onChange={(v) => updateShow(show.key, 'notes', v)} />
         </View>
       ))}
 
       <Pressable style={styles.importButton} onPress={handleImport} disabled={phase === 'importing' || shows.length === 0}>
         {phase === 'importing' ? (
-          <ActivityIndicator color="#0b0b0f" />
+          <ActivityIndicator color={colors.onAccent} />
         ) : (
           <Text style={styles.importButtonText}>Import {shows.length} Date{shows.length === 1 ? '' : 's'}</Text>
         )}
@@ -283,16 +290,20 @@ function Field({
   value,
   onChange,
   flex,
+  styles,
+  colors,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   flex?: boolean;
+  styles: Styles;
+  colors: ThemeColors;
 }) {
   return (
     <View style={flex ? styles.fieldFlex : styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.fieldInput} value={value} onChangeText={onChange} placeholder="—" placeholderTextColor="#6b6b76" />
+      <TextInput style={styles.fieldInput} value={value} onChangeText={onChange} placeholder="—" placeholderTextColor={colors.textFaint} />
     </View>
   );
 }
@@ -301,31 +312,46 @@ function venueCacheKey(name: string, city: string): string {
   return `${name.trim().toLowerCase()}|${city.trim().toLowerCase()}`;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centeredContainer: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  subtitle: { color: '#9a9aa5', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, textAlign: 'center', marginBottom: 12 },
-  pickButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 28, marginTop: 8 },
-  pickButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-  card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 14, marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  cardIndex: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' },
-  removeText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  row: { flexDirection: 'row', gap: 10 },
-  field: { marginBottom: 8 },
-  fieldFlex: { flex: 1, marginBottom: 8 },
-  fieldLabel: { color: '#6b6b76', fontSize: 11, marginBottom: 3 },
-  fieldInput: {
-    backgroundColor: '#0b0b0f',
-    color: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-  importButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  importButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centeredContainer: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 8, textAlign: 'center' },
+    subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, textAlign: 'center', marginBottom: 12, fontFamily: fonts.body },
+    pickButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 28, marginTop: 8 },
+    pickButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    cardIndex: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+    removeText: { color: colors.danger, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    row: { flexDirection: 'row', gap: 10 },
+    field: { marginBottom: 8 },
+    fieldFlex: { flex: 1, marginBottom: 8 },
+    fieldLabel: { color: colors.textFaint, fontSize: 11, marginBottom: 3, fontFamily: fonts.body },
+    fieldInput: {
+      backgroundColor: colors.bg,
+      color: colors.text,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    importButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+    importButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

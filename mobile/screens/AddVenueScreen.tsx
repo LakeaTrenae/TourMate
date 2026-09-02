@@ -12,8 +12,11 @@
  * is going to type coordinates by hand. Weather (ShowDetailScreen) and
  * Route (RouteScreen) both silently skip any venue with no coordinates,
  * so geocoding is optional, not required to save.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +27,7 @@ import { useAuth } from '../lib/auth-context';
 import { geocodeAddress } from '../lib/geo';
 import { newId } from '../lib/ids';
 import { parseOptionalNumber } from '../lib/numbers';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddVenue'>;
@@ -34,6 +38,8 @@ export function AddVenueScreen({ route, navigation }: Props) {
   const { organizationId, venueId } = route.params;
   const isEditing = !!venueId;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [loading, setLoading] = useState(isEditing);
   const [name, setName] = useState('');
@@ -237,7 +243,7 @@ export function AddVenueScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -246,18 +252,18 @@ export function AddVenueScreen({ route, navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{isEditing ? 'Edit Venue' : 'Add Venue'}</Text>
 
-      <TextInput style={styles.input} placeholder="Venue name" placeholderTextColor="#6b6b76" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Address" placeholderTextColor="#6b6b76" value={address} onChangeText={setAddress} />
+      <TextInput style={styles.input} placeholder="Venue name" placeholderTextColor={colors.textFaint} value={name} onChangeText={setName} />
+      <TextInput style={styles.input} placeholder="Address" placeholderTextColor={colors.textFaint} value={address} onChangeText={setAddress} />
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="City" placeholderTextColor="#6b6b76" value={city} onChangeText={setCity} />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="State" placeholderTextColor="#6b6b76" value={state} onChangeText={setState} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="City" placeholderTextColor={colors.textFaint} value={city} onChangeText={setCity} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="State" placeholderTextColor={colors.textFaint} value={state} onChangeText={setState} />
       </View>
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Country" placeholderTextColor="#6b6b76" value={country} onChangeText={setCountry} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Country" placeholderTextColor={colors.textFaint} value={country} onChangeText={setCountry} />
         <TextInput
           style={[styles.input, styles.rowInput]}
           placeholder="Capacity"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={capacity}
           onChangeText={setCapacity}
           keyboardType="number-pad"
@@ -265,7 +271,7 @@ export function AddVenueScreen({ route, navigation }: Props) {
       </View>
 
       <Pressable style={styles.geocodeButton} onPress={handleGeocode} disabled={geocoding}>
-        {geocoding ? <ActivityIndicator color="#7c9cff" /> : <Text style={styles.geocodeButtonText}>Locate city (for weather & route)</Text>}
+        {geocoding ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.geocodeButtonText}>Locate city (for weather & route)</Text>}
       </Pressable>
       {coords && (
         <Text style={styles.coordsText}>
@@ -287,7 +293,7 @@ export function AddVenueScreen({ route, navigation }: Props) {
               </Pressable>
             ))}
             <Pressable style={styles.addPhotoButton} onPress={handlePickPhoto} disabled={uploadingPhoto}>
-              {uploadingPhoto ? <ActivityIndicator color="#7c9cff" /> : <Text style={styles.addPhotoButtonText}>+ Photo</Text>}
+              {uploadingPhoto ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.addPhotoButtonText}>+ Photo</Text>}
             </Pressable>
           </ScrollView>
           {photos.length > 0 && <Text style={styles.photosHint}>Tap the ✕ (or hold a photo) to delete it.</Text>}
@@ -297,69 +303,74 @@ export function AddVenueScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>{isEditing ? 'Save Venue' : 'Add Venue'}</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>{isEditing ? 'Save Venue' : 'Add Venue'}</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: { flexDirection: 'row', gap: 10 },
-  rowInput: { flex: 1 },
-  geocodeButton: {
-    backgroundColor: '#1a1a20',
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  geocodeButtonText: { color: '#7c9cff', fontSize: 14, fontWeight: '600' },
-  coordsText: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 20, marginBottom: 4 },
-  photosHint: { color: '#6b6b76', fontSize: 12, marginBottom: 8 },
-  photoRow: { flexGrow: 0 },
-  photoRowContent: { gap: 10, paddingRight: 8 },
-  photoWrap: { position: 'relative' },
-  photoThumb: { width: 88, height: 88, borderRadius: 10, backgroundColor: '#1a1a20' },
-  photoDeleteButton: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#ff6b6b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoDeleteButtonText: { color: '#0b0b0f', fontSize: 12, fontWeight: '700' },
-  addPhotoButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPhotoButtonText: { color: '#7c9cff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 12 },
-  submitButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: { flexDirection: 'row', gap: 10 },
+    rowInput: { flex: 1 },
+    geocodeButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    geocodeButtonText: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    coordsText: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.mono },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 4 },
+    photosHint: { color: colors.textFaint, fontSize: 12, marginBottom: 8, fontFamily: fonts.body },
+    photoRow: { flexGrow: 0 },
+    photoRowContent: { gap: 10, paddingRight: 8 },
+    photoWrap: { position: 'relative' },
+    photoThumb: { width: 88, height: 88, borderRadius: 10, backgroundColor: colors.surface2 },
+    photoDeleteButton: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: colors.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoDeleteButtonText: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bodyBold },
+    addPhotoButton: {
+      width: 88,
+      height: 88,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addPhotoButtonText: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold, textAlign: 'center' },
+    error: { color: colors.danger, fontSize: 13, marginTop: 12, fontFamily: fonts.body },
+    submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}
