@@ -5,8 +5,13 @@
  * lib/geo's keyless Open-Meteo lookup, silently omitted for dates outside
  * the ~16-day forecast horizon), and links out to that date's Advance
  * sheet and (manager-only) Settlement.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx. TimeRow is a module-level helper, so it
+ * takes the computed `styles` as a prop rather than closing over a
+ * module-level StyleSheet the way the pre-theme version did.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -18,9 +23,11 @@ import { formatDateOnly } from '../lib/dates';
 import { fetchForecast, weatherCodeLabel, type ForecastResult } from '../lib/geo';
 import { buildDaySheetHtml } from '../lib/dayPrint';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShowDetail'>;
+type Styles = ReturnType<typeof createStyles>;
 
 type ShowDetail = {
   date: string;
@@ -54,16 +61,18 @@ type DressingRoom = { id: string; room_name: string; artist_id: string | null; n
 type ArtistOption = { id: string; name: string };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
-const STATUS_COLORS: Record<string, string> = {
-  confirmed: '#7ee787',
-  hold: '#e8c274',
-  cancelled: '#ff6b6b',
-  postponed: '#e8c274',
-};
+
+function statusColor(colors: ThemeColors, status: string): string {
+  if (status === 'confirmed') return colors.success;
+  if (status === 'cancelled') return colors.danger;
+  return colors.warn; // hold, postponed
+}
 
 export function ShowDetailScreen({ route, navigation }: Props) {
   const { tourId, tourDateId } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [show, setShow] = useState<ShowDetail | null>(null);
   const [isManager, setIsManager] = useState(false);
@@ -236,7 +245,7 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   if (loading || !show) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -254,7 +263,7 @@ export function ShowDetailScreen({ route, navigation }: Props) {
 
       <Text style={styles.dateLabel}>{dateLabel}</Text>
       <View style={styles.statusRow}>
-        <Text style={[styles.statusBadge, { color: STATUS_COLORS[show.show_status] }]}>{show.show_status.toUpperCase()}</Text>
+        <Text style={[styles.statusBadge, { color: statusColor(colors, show.show_status) }]}>{show.show_status.toUpperCase()}</Text>
         {forecast && (
           <Text style={styles.weather}>
             {Math.round(forecast.tempHighF)}° / {Math.round(forecast.tempLowF)}°F · {weatherCodeLabel(forecast.weatherCode)}
@@ -303,12 +312,12 @@ export function ShowDetailScreen({ route, navigation }: Props) {
               <TextInput
                 style={styles.addRoomInput}
                 placeholder="Room name (e.g. Room A)"
-                placeholderTextColor="#6b6b76"
+                placeholderTextColor={colors.textFaint}
                 value={newRoomName}
                 onChangeText={setNewRoomName}
               />
               <Pressable style={styles.addRoomButton} onPress={handleAddRoom} disabled={addingRoom || !newRoomName.trim()}>
-                {addingRoom ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.addRoomButtonText}>Add</Text>}
+                {addingRoom ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.addRoomButtonText}>Add</Text>}
               </Pressable>
             </View>
           )}
@@ -355,10 +364,10 @@ export function ShowDetailScreen({ route, navigation }: Props) {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Schedule</Text>
-        <TimeRow label="Load-in" value={show.load_in} />
-        <TimeRow label="Soundcheck" value={show.soundcheck} />
-        <TimeRow label="Doors" value={show.doors} />
-        <TimeRow label="Set time" value={show.set_time} />
+        <TimeRow styles={styles} label="Load-in" value={show.load_in} />
+        <TimeRow styles={styles} label="Soundcheck" value={show.soundcheck} />
+        <TimeRow styles={styles} label="Doors" value={show.doors} />
+        <TimeRow styles={styles} label="Set time" value={show.set_time} />
       </View>
 
       {(show.promoter_name || show.promoter_phone || show.promoter_email) && (
@@ -408,7 +417,7 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   );
 }
 
-function TimeRow({ label, value }: { label: string; value: string | null }) {
+function TimeRow({ label, value, styles }: { label: string; value: string | null; styles: Styles }) {
   return (
     <View style={styles.timeRow}>
       <Text style={styles.timeLabel}>{label}</Text>
@@ -417,71 +426,86 @@ function TimeRow({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  dateLabel: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 16 },
-  statusBadge: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-  weather: { color: '#9a9aa5', fontSize: 13 },
-  emptyText: { color: '#6b6b76', fontSize: 14, marginBottom: 12 },
-  card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 12 },
-  venueName: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  venueMeta: { color: '#9a9aa5', fontSize: 13, marginTop: 4 },
-  capacityWarning: { color: '#e8c274', fontSize: 12, fontWeight: '600', marginTop: 6 },
-  photoRow: { flexGrow: 0, marginTop: 12 },
-  photoRowContent: { gap: 8 },
-  photoThumb: { width: 96, height: 96, borderRadius: 10, backgroundColor: '#0b0b0f' },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  sectionAction: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  roomActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  privacyNote: { color: '#6b6b76', fontSize: 11, marginBottom: 10, fontStyle: 'italic' },
-  addRoomRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  addRoomInput: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    color: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-  },
-  addRoomButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
-  addRoomButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  roomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a32',
-    paddingTop: 10,
-    marginTop: 10,
-  },
-  roomInfo: { flex: 1 },
-  roomName: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  roomArtist: { color: '#9a9aa5', fontSize: 12, marginTop: 2 },
-  artistChipRow: { flexGrow: 0, maxWidth: 220 },
-  artistChip: { backgroundColor: '#0b0b0f', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
-  artistChipText: { color: '#7c9cff', fontSize: 12, fontWeight: '600' },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  timeLabel: { color: '#6b6b76', fontSize: 13 },
-  timeValue: { color: '#fff', fontSize: 13 },
-  detailText: { color: '#fff', fontSize: 14, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  actionButton: { flex: 1, backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  actionButtonText: { color: '#0b0b0f', fontSize: 15, fontWeight: '600' },
-  printButton: {
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  printButtonText: { color: '#9a9aa5', fontSize: 14, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    dateLabel: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 16 },
+    statusBadge: { fontSize: 12, fontFamily: fonts.bodyBold, letterSpacing: 0.5 },
+    weather: { color: colors.textDim, fontSize: 13, fontFamily: fonts.mono },
+    emptyText: { color: colors.textFaint, fontSize: 14, marginBottom: 12, fontFamily: fonts.body },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    venueName: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold },
+    venueMeta: { color: colors.textDim, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
+    capacityWarning: { color: colors.warn, fontSize: 12, fontFamily: fonts.bodySemiBold, marginTop: 6 },
+    photoRow: { flexGrow: 0, marginTop: 12 },
+    photoRowContent: { gap: 8 },
+    photoThumb: { width: 96, height: 96, borderRadius: 10, backgroundColor: colors.surface2 },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+    sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    sectionAction: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    roomActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+    deleteButtonText: { color: colors.danger, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    privacyNote: { color: colors.textFaint, fontSize: 11, marginBottom: 10, fontStyle: 'italic', fontFamily: fonts.body },
+    addRoomRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+    addRoomInput: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      color: colors.text,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    addRoomButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
+    addRoomButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    roomRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 10,
+      marginTop: 10,
+    },
+    roomInfo: { flex: 1 },
+    roomName: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    roomArtist: { color: colors.textDim, fontSize: 12, marginTop: 2, fontFamily: fonts.body },
+    artistChipRow: { flexGrow: 0, maxWidth: 220 },
+    artistChip: { backgroundColor: colors.bg, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
+    artistChipText: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    timeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+    timeLabel: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    timeValue: { color: colors.text, fontSize: 13, fontFamily: fonts.mono },
+    detailText: { color: colors.text, fontSize: 14, marginTop: 2, fontFamily: fonts.body },
+    actions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+    actionButton: { flex: 1, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+    actionButtonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bodySemiBold },
+    printButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    printButtonText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
+  });
+}
