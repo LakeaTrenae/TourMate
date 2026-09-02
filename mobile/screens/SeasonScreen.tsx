@@ -6,6 +6,9 @@
  * "tours readable by members" in 0001_init.sql) — start_date/end_date are
  * always reliable here since they're auto-computed from tour_dates by
  * the sync_tour_date_range trigger (0016), never manually entered.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,6 +17,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 
 import { supabase } from '../lib/supabase';
 import { formatDateOnly } from '../lib/dates';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Season'>;
@@ -28,6 +32,9 @@ type TourRow = {
 };
 
 export function SeasonScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [tours, setTours] = useState<TourRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -95,7 +102,7 @@ export function SeasonScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -138,29 +145,41 @@ export function SeasonScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  yearGroup: { marginBottom: 20 },
-  yearLabel: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 10 },
-  orgGroup: { marginBottom: 10 },
-  orgLabel: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
-  card: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14, marginBottom: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tourName: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  completedBadge: {
-    color: '#6b6b76',
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    backgroundColor: '#0b0b0f',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  tourDates: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4, marginBottom: 16 },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    yearGroup: { marginBottom: 20 },
+    yearLabel: { color: colors.text, fontSize: 20, fontFamily: fonts.displayBold, marginBottom: 10 },
+    orgGroup: { marginBottom: 10 },
+    orgLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    tourName: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold },
+    completedBadge: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+      backgroundColor: colors.surface2,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    tourDates: { color: colors.textFaint, fontSize: 12, marginTop: 4, fontFamily: fonts.mono },
+  });
+}

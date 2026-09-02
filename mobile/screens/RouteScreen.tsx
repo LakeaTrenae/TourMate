@@ -7,8 +7,11 @@
  * A show whose venue has no coordinates yet (never geocoded, or no venue
  * set at all) just shows "—" for its distance rather than breaking the
  * chain for shows around it.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -18,6 +21,7 @@ import { supabase } from '../lib/supabase';
 import { formatDateOnly } from '../lib/dates';
 import { haversineDistanceMiles } from '../lib/geo';
 import { buildRouteMapHtml } from '../lib/routeMapHtml';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Route'>;
@@ -33,6 +37,8 @@ type Stop = {
 
 export function RouteScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [stops, setStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +82,7 @@ export function RouteScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -153,26 +159,37 @@ export function RouteScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  toggleButton: { backgroundColor: '#1a1a20', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  toggleButtonText: { color: '#7c9cff', fontSize: 13, fontWeight: '600' },
-  disclaimer: { color: '#6b6b76', fontSize: 12, marginBottom: 16, fontStyle: 'italic' },
-  mapContainer: { flex: 1, borderRadius: 12, overflow: 'hidden' },
-  map: { flex: 1, backgroundColor: '#0b0b0f' },
-  mapNote: { color: '#6b6b76', fontSize: 11, fontStyle: 'italic', paddingVertical: 8 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16 },
-  dateLabel: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' },
-  venueLabel: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 4 },
-  cityLabel: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  connector: { alignItems: 'center', paddingVertical: 6 },
-  connectorLine: { width: 1, height: 14, backgroundColor: '#2a2a32' },
-  connectorText: { color: '#6b6b76', fontSize: 11, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    toggleButton: { backgroundColor: colors.surface2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    toggleButtonText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    disclaimer: { color: colors.textFaint, fontSize: 12, marginBottom: 16, fontStyle: 'italic', fontFamily: fonts.body },
+    mapContainer: { flex: 1, borderRadius: 12, overflow: 'hidden' },
+    map: { flex: 1, backgroundColor: colors.bg },
+    mapNote: { color: colors.textFaint, fontSize: 11, fontStyle: 'italic', paddingVertical: 8, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    dateLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.4 },
+    venueLabel: { color: colors.text, fontSize: 17, fontFamily: fonts.displayBold, marginTop: 4 },
+    cityLabel: { color: colors.textFaint, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    connector: { alignItems: 'center', paddingVertical: 6 },
+    connectorLine: { width: 1, height: 14, backgroundColor: colors.border },
+    connectorText: { color: colors.textFaint, fontSize: 11, marginTop: 2, fontFamily: fonts.mono },
+  });
+}

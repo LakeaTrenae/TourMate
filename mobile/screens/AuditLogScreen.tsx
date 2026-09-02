@@ -3,13 +3,17 @@
  * readable by managers", 0031), reverse-chronological, filterable by
  * resource type. Read-only — there's no edit/delete UI for audit log
  * rows on purpose (append-only at the RLS layer too, see 0031).
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 import type { AuditAction, AuditResourceType } from '../lib/auditLog';
 
@@ -47,6 +51,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
 
 export function AuditLogScreen({ route }: Props) {
   const { tourId, tourName } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [activeType, setActiveType] = useState<AuditResourceType | null>(null);
@@ -97,7 +103,7 @@ export function AuditLogScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -125,7 +131,7 @@ export function AuditLogScreen({ route }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={filtered.length === 0 && styles.emptyContainer}
       >
         {filtered.length === 0 ? (
@@ -151,25 +157,37 @@ export function AuditLogScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  chipRow: { flexGrow: 0, marginBottom: 12 },
-  chipRowContent: { gap: 8, paddingRight: 8 },
-  chip: { backgroundColor: '#1a1a20', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7 },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14, marginBottom: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  action: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  timestamp: { color: '#6b6b76', fontSize: 11 },
-  actor: { color: '#9a9aa5', fontSize: 12, marginTop: 4 },
-  detail: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    chipRow: { flexGrow: 0, marginBottom: 12 },
+    chipRowContent: { gap: 8, paddingRight: 8 },
+    chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7 },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    action: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    timestamp: { color: colors.textFaint, fontSize: 11, fontFamily: fonts.mono },
+    actor: { color: colors.textDim, fontSize: 12, marginTop: 4, fontFamily: fonts.body },
+    detail: { color: colors.textFaint, fontSize: 12, marginTop: 4, fontFamily: fonts.body },
+  });
+}
