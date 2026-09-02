@@ -9,14 +9,18 @@
  *
  * `emergency_contact_info` has no trigger, so this write can safely
  * chain nothing extra — a plain upsert, same as passport_visa_info.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, Pressable, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EmergencyContact'>;
@@ -24,6 +28,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EmergencyContact'>;
 export function EmergencyContactScreen({ route }: Props) {
   const { targetUserId, targetName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const viewingSelf = !targetUserId || targetUserId === session?.user.id;
   const subjectId = targetUserId ?? session?.user.id ?? '';
@@ -97,7 +103,7 @@ export function EmergencyContactScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -114,7 +120,7 @@ export function EmergencyContactScreen({ route }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Contact name"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={contactName}
         onChangeText={setContactName}
         editable={viewingSelf}
@@ -122,21 +128,21 @@ export function EmergencyContactScreen({ route }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Relationship (e.g. Spouse, Parent)"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={relationship}
         onChangeText={setRelationship}
         editable={viewingSelf}
       />
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor="#6b6b76" value={phone} onChangeText={setPhone} editable={viewingSelf} keyboardType="phone-pad" />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Alternate phone" placeholderTextColor="#6b6b76" value={alternatePhone} onChangeText={setAlternatePhone} editable={viewingSelf} keyboardType="phone-pad" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor={colors.textFaint} value={phone} onChangeText={setPhone} editable={viewingSelf} keyboardType="phone-pad" />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Alternate phone" placeholderTextColor={colors.textFaint} value={alternatePhone} onChangeText={setAlternatePhone} editable={viewingSelf} keyboardType="phone-pad" />
       </View>
 
       <Text style={styles.sectionTitle}>Notes</Text>
       <TextInput
         style={[styles.input, styles.notesInput]}
         placeholder="Allergies, medical conditions, anything responders should know"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={notes}
         onChangeText={setNotes}
         editable={viewingSelf}
@@ -145,34 +151,39 @@ export function EmergencyContactScreen({ route }: Props) {
 
       {viewingSelf && (
         <Pressable style={styles.saveButton} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save</Text>}
+          {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save</Text>}
         </Pressable>
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyText: { color: '#6b6b76', fontSize: 13, marginBottom: 12 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: { flexDirection: 'row', gap: 10 },
-  rowInput: { flex: 1 },
-  notesInput: { minHeight: 80, textAlignVertical: 'top' },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 8 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: { flexDirection: 'row', gap: 10 },
+    rowInput: { flex: 1 },
+    notesInput: { minHeight: 80, textAlignVertical: 'top' },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+    saveButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

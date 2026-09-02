@@ -9,14 +9,18 @@
  * `passport_visa_info` has no trigger, so this is one of the few writes
  * in the app that can safely chain `.select()` onto an upsert without
  * hitting the RETURNING/RLS interaction documented in lib/ids.ts.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, Pressable, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PassportVisa'>;
@@ -24,6 +28,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PassportVisa'>;
 export function PassportVisaScreen({ route }: Props) {
   const { targetUserId, targetName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const viewingSelf = !targetUserId || targetUserId === session?.user.id;
   const subjectId = targetUserId ?? session?.user.id ?? '';
@@ -103,7 +109,7 @@ export function PassportVisaScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -120,28 +126,28 @@ export function PassportVisaScreen({ route }: Props) {
       <TextInput
         style={styles.input}
         placeholder="Passport number"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={passportNumber}
         onChangeText={setPassportNumber}
         editable={viewingSelf}
       />
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Issuing country" placeholderTextColor="#6b6b76" value={passportCountry} onChangeText={setPassportCountry} editable={viewingSelf} />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Expiry (YYYY-MM-DD)" placeholderTextColor="#6b6b76" value={passportExpiry} onChangeText={setPassportExpiry} editable={viewingSelf} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Issuing country" placeholderTextColor={colors.textFaint} value={passportCountry} onChangeText={setPassportCountry} editable={viewingSelf} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Expiry (YYYY-MM-DD)" placeholderTextColor={colors.textFaint} value={passportExpiry} onChangeText={setPassportExpiry} editable={viewingSelf} />
       </View>
 
       <Text style={styles.sectionTitle}>Visa</Text>
-      <TextInput style={styles.input} placeholder="Visa type (e.g. P-2, ESTA)" placeholderTextColor="#6b6b76" value={visaType} onChangeText={setVisaType} editable={viewingSelf} />
+      <TextInput style={styles.input} placeholder="Visa type (e.g. P-2, ESTA)" placeholderTextColor={colors.textFaint} value={visaType} onChangeText={setVisaType} editable={viewingSelf} />
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Visa number" placeholderTextColor="#6b6b76" value={visaNumber} onChangeText={setVisaNumber} editable={viewingSelf} />
-        <TextInput style={[styles.input, styles.rowInput]} placeholder="Expiry (YYYY-MM-DD)" placeholderTextColor="#6b6b76" value={visaExpiry} onChangeText={setVisaExpiry} editable={viewingSelf} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Visa number" placeholderTextColor={colors.textFaint} value={visaNumber} onChangeText={setVisaNumber} editable={viewingSelf} />
+        <TextInput style={[styles.input, styles.rowInput]} placeholder="Expiry (YYYY-MM-DD)" placeholderTextColor={colors.textFaint} value={visaExpiry} onChangeText={setVisaExpiry} editable={viewingSelf} />
       </View>
 
       <Text style={styles.sectionTitle}>Notes</Text>
       <TextInput
         style={[styles.input, styles.notesInput]}
         placeholder="Anything else worth flagging"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={notes}
         onChangeText={setNotes}
         editable={viewingSelf}
@@ -150,34 +156,39 @@ export function PassportVisaScreen({ route }: Props) {
 
       {viewingSelf && (
         <Pressable style={styles.saveButton} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save</Text>}
+          {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save</Text>}
         </Pressable>
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyText: { color: '#6b6b76', fontSize: 13, marginBottom: 12 },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  row: { flexDirection: 'row', gap: 10 },
-  rowInput: { flex: 1 },
-  notesInput: { minHeight: 80, textAlignVertical: 'top' },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 8 },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    row: { flexDirection: 'row', gap: 10 },
+    rowInput: { flex: 1 },
+    notesInput: { minHeight: 80, textAlignVertical: 'top' },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+    saveButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

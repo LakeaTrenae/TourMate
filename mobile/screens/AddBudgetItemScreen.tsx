@@ -8,8 +8,11 @@
  * the same insert+representation issue everywhere else in this app), then
  * upload the receipt file to that exact path second. If the upload fails,
  * the row is cleaned up rather than left pointing at a missing file.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -26,6 +29,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import { logAuditEvent } from '../lib/auditLog';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddBudgetItem'>;
@@ -35,6 +39,8 @@ type PickedReceipt = { uri: string; name: string; mimeType: string | null };
 export function AddBudgetItemScreen({ route, navigation }: Props) {
   const { tourId } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [entryType, setEntryType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
@@ -140,12 +146,12 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      <TextInput style={styles.input} placeholder="Category — e.g. Travel, Merch, Guarantee" placeholderTextColor="#6b6b76" value={category} onChangeText={setCategory} />
-      <TextInput style={styles.input} placeholder="Description (optional)" placeholderTextColor="#6b6b76" value={description} onChangeText={setDescription} />
+      <TextInput style={styles.input} placeholder="Category — e.g. Travel, Merch, Guarantee" placeholderTextColor={colors.textFaint} value={category} onChangeText={setCategory} />
+      <TextInput style={styles.input} placeholder="Description (optional)" placeholderTextColor={colors.textFaint} value={description} onChangeText={setDescription} />
       <TextInput
         style={styles.input}
         placeholder="Amount (USD)"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={amount}
         onChangeText={setAmount}
         keyboardType="decimal-pad"
@@ -158,56 +164,61 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.submitButtonText}>Add Entry</Text>}
+        {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.submitButtonText}>Add Entry</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  typeButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#1a1a20',
-  },
-  typeButtonSelectedExpense: { backgroundColor: '#3a1e1e' },
-  typeButtonSelectedIncome: { backgroundColor: '#1e3a24' },
-  typeButtonText: { color: '#9a9aa5', fontSize: 14, fontWeight: '600' },
-  typeButtonTextSelected: { color: '#fff' },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 15,
-  },
-  receiptPicker: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    borderStyle: 'dashed',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginTop: 4,
-    alignItems: 'center',
-  },
-  receiptPickerText: { color: '#9a9aa5', fontSize: 14 },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 8 },
-  submitButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  submitButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+    typeButton: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderRadius: 8,
+      backgroundColor: colors.surface2,
+    },
+    typeButtonSelectedExpense: { backgroundColor: colors.dangerSoft },
+    typeButtonSelectedIncome: { backgroundColor: colors.successSoft },
+    typeButtonText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    typeButtonTextSelected: { color: colors.text },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    receiptPicker: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      marginTop: 4,
+      alignItems: 'center',
+    },
+    receiptPickerText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginTop: 8, fontFamily: fonts.body },
+    submitButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}
