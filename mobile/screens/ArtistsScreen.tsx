@@ -5,8 +5,11 @@
  * (management contacts, team roster, dressing room, tagged riders) lives
  * one tap in, on ArtistDetailScreen, gated to management + that artist's
  * own team.
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -24,6 +27,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Artists'>;
@@ -32,9 +36,17 @@ type Artist = { id: string; name: string };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function ArtistsScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [artists, setArtists] = useState<Artist[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -110,11 +122,31 @@ export function ArtistsScreen({ route, navigation }: Props) {
     );
   }
 
+  const rows = useMemo(() => chunkPairs(artists), [artists]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
+    );
+  }
+
+  function renderArtistCard(artist: Artist) {
+    return (
+      <Pressable
+        key={artist.id}
+        style={styles.card}
+        onPress={() => navigation.navigate('ArtistDetail', { artistId: artist.id, tourId, artistName: artist.name })}
+        onLongPress={canManage ? () => confirmDelete(artist) : undefined}
+      >
+        <Text style={styles.artistName}>{artist.name}</Text>
+        {canManage && (
+          <Pressable style={styles.deleteButton} onPress={() => confirmDelete(artist)}>
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </Pressable>
+        )}
+      </Pressable>
     );
   }
 
@@ -130,12 +162,12 @@ export function ArtistsScreen({ route, navigation }: Props) {
           <TextInput
             style={styles.addInput}
             placeholder="Artist or act name"
-            placeholderTextColor="#6b6b76"
+            placeholderTextColor={colors.textFaint}
             value={newName}
             onChangeText={setNewName}
           />
           <Pressable style={styles.addButton} onPress={handleAdd} disabled={adding || !newName.trim()}>
-            {adding ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.addButtonText}>Add</Text>}
+            {adding ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.addButtonText}>Add</Text>}
           </Pressable>
         </View>
       )}
@@ -143,29 +175,17 @@ export function ArtistsScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={artists.length === 0 && styles.emptyContainer}
       >
         {artists.length === 0 ? (
           <Text style={styles.emptyText}>No artists added yet.</Text>
         ) : (
-          artists.map((artist) => (
-            <Pressable
-              key={artist.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('ArtistDetail', { artistId: artist.id, tourId, artistName: artist.name })}
-              onLongPress={canManage ? () => confirmDelete(artist) : undefined}
-            >
-              <Text style={styles.artistName}>{artist.name}</Text>
-              <View style={styles.cardActions}>
-                {canManage && (
-                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(artist)}>
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </Pressable>
-                )}
-                <Text style={styles.openArrow}>›</Text>
-              </View>
-            </Pressable>
+          rows.map((row, i) => (
+            <View key={row.map((a) => a.id).join('-') || i} style={styles.row}>
+              {row.map(renderArtistCard)}
+              {row.length === 1 && <View style={styles.rowSpacer} />}
+            </View>
           ))
         )}
         {canManage && artists.length > 0 && <Text style={styles.hint}>Tap Delete (or hold an artist) to remove them.</Text>}
@@ -174,40 +194,53 @@ export function ArtistsScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  addInput: {
-    flex: 1,
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  addButton: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 20, justifyContent: 'center' },
-  addButtonText: { color: '#0b0b0f', fontSize: 14, fontWeight: '600' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-  artistName: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  openArrow: { color: '#6b6b76', fontSize: 18 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    addInput: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    addButton: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 20, justifyContent: 'center' },
+    addButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    rowSpacer: { flex: 1 },
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    artistName: { color: colors.text, fontSize: 16, fontFamily: fonts.displaySemiBold, marginBottom: 8 },
+    deleteButton: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.dangerSoft,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    deleteButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+  });
+}

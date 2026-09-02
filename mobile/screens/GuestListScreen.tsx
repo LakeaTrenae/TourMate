@@ -7,8 +7,12 @@
  * guest list requests directly). Approving/denying, though, is
  * manager-only — both in the UI (buttons hidden for non-managers) and in
  * RLS ("guest_list updatable by managers", 0002_policy_gaps.sql).
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx. Each date's requests
+ * are chunked into pairs for a 2-up grid, same trick as TourListScreen.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -26,6 +30,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatDateOnly } from '../lib/dates';
 import { notify } from '../lib/notify';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GuestList'>;
@@ -44,9 +49,17 @@ type GuestRequest = {
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function GuestListScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [isManager, setIsManager] = useState(false);
   const [dates, setDates] = useState<TourDate[]>([]);
@@ -163,11 +176,54 @@ export function GuestListScreen({ route, navigation }: Props) {
     ]);
   }
 
+  function statusColor(status: GuestRequest['status']) {
+    if (status === 'approved') return colors.success;
+    if (status === 'denied') return colors.danger;
+    return colors.warn;
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
+    );
+  }
+
+  function renderRequestCard(r: GuestRequest) {
+    return (
+      <Pressable key={r.id} style={styles.card} onLongPress={isManager ? () => confirmDelete(r) : undefined}>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, { backgroundColor: statusColor(r.status) }]} />
+          <Text style={[styles.statusText, { color: statusColor(r.status) }]}>{r.status}</Text>
+        </View>
+        <Text style={styles.guestName}>
+          {r.guest_name} {r.guest_count > 1 ? `(+${r.guest_count - 1})` : ''}
+        </Text>
+        <Text style={styles.requester}>By {r.requester?.display_name ?? 'Unknown'}</Text>
+        {r.notes && (
+          <Text style={styles.notes} numberOfLines={2}>
+            {r.notes}
+          </Text>
+        )}
+        {isManager && (
+          <View style={styles.actions}>
+            {r.status === 'pending' && (
+              <>
+                <Pressable style={styles.approveButton} onPress={() => updateStatus(r, 'approved')}>
+                  <Text style={styles.approveButtonText}>Approve</Text>
+                </Pressable>
+                <Pressable style={styles.denyButton} onPress={() => updateStatus(r, 'denied')}>
+                  <Text style={styles.denyButtonText}>Deny</Text>
+                </Pressable>
+              </>
+            )}
+            <Pressable style={styles.deleteButton} onPress={() => confirmDelete(r)}>
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </Pressable>
+          </View>
+        )}
+      </Pressable>
     );
   }
 
@@ -190,7 +246,7 @@ export function GuestListScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={dates.length === 0 && styles.emptyContainer}
       >
         {dates.length === 0 ? (
@@ -199,6 +255,7 @@ export function GuestListScreen({ route, navigation }: Props) {
           dates.map((d) => {
             const requests = requestsByDate[d.id] ?? [];
             const warning = capacityWarning(d);
+            const rows = chunkPairs(requests);
             return (
               <View key={d.id} style={styles.dateGroup}>
                 <Text style={styles.dateLabel}>{formatDate(d.date)}</Text>
@@ -206,38 +263,11 @@ export function GuestListScreen({ route, navigation }: Props) {
                 {requests.length === 0 ? (
                   <Text style={styles.emptyText}>No requests for this date.</Text>
                 ) : (
-                  requests.map((r) => (
-                    <Pressable
-                      key={r.id}
-                      style={styles.card}
-                      onLongPress={isManager ? () => confirmDelete(r) : undefined}
-                    >
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.guestName}>
-                          {r.guest_name} {r.guest_count > 1 ? `(+${r.guest_count - 1})` : ''}
-                        </Text>
-                        <Text style={[styles.statusBadge, statusStyle(r.status)]}>{r.status}</Text>
-                      </View>
-                      <Text style={styles.requester}>Requested by {r.requester?.display_name ?? 'Unknown'}</Text>
-                      {r.notes && <Text style={styles.notes}>{r.notes}</Text>}
-                      {isManager ? (
-                        <View style={styles.actions}>
-                          {r.status === 'pending' && (
-                            <>
-                              <Pressable style={styles.approveButton} onPress={() => updateStatus(r, 'approved')}>
-                                <Text style={styles.approveButtonText}>Approve</Text>
-                              </Pressable>
-                              <Pressable style={styles.denyButton} onPress={() => updateStatus(r, 'denied')}>
-                                <Text style={styles.denyButtonText}>Deny</Text>
-                              </Pressable>
-                            </>
-                          )}
-                          <Pressable style={styles.deleteButton} onPress={() => confirmDelete(r)}>
-                            <Text style={styles.deleteButtonText}>Delete</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </Pressable>
+                  rows.map((row, i) => (
+                    <View key={row.map((r) => r.id).join('-') || i} style={styles.row}>
+                      {row.map(renderRequestCard)}
+                      {row.length === 1 && <View style={styles.rowSpacer} />}
+                    </View>
                   ))
                 )}
               </View>
@@ -250,38 +280,47 @@ export function GuestListScreen({ route, navigation }: Props) {
   );
 }
 
-function statusStyle(status: string) {
-  if (status === 'approved') return { color: '#7ee787' };
-  if (status === 'denied') return { color: '#ff6b6b' };
-  return { color: '#e8c274' };
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 13, textAlign: 'center', fontFamily: fonts.body },
+    dateGroup: { marginBottom: 20 },
+    dateLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
+    capacityWarning: { color: colors.warn, fontSize: 12, fontFamily: fonts.bodySemiBold, marginBottom: 8 },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    rowSpacer: { flex: 1 },
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 13,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 7 },
+    statusDot: { width: 5, height: 5, borderRadius: 3 },
+    statusText: { fontSize: 9, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+    guestName: { color: colors.text, fontSize: 14.5, fontFamily: fonts.displaySemiBold, marginBottom: 4 },
+    requester: { color: colors.textDim, fontSize: 10.5, fontFamily: fonts.mono },
+    notes: { color: colors.textDim, fontSize: 11.5, marginTop: 6, fontFamily: fonts.body },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+    approveButton: { backgroundColor: colors.successSoft, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    approveButtonText: { color: colors.success, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    denyButton: { backgroundColor: colors.dangerSoft, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    denyButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    deleteButton: { backgroundColor: colors.surface2, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    deleteButtonText: { color: colors.textDim, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: fonts.body },
+  });
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 13, textAlign: 'center' },
-  dateGroup: { marginBottom: 18 },
-  dateLabel: { color: '#9a9aa5', fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  capacityWarning: { color: '#e8c274', fontSize: 12, fontWeight: '600', marginBottom: 8 },
-  card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 14, marginBottom: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  guestName: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  statusBadge: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  requester: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-  notes: { color: '#9a9aa5', fontSize: 13, marginTop: 6 },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  approveButton: { backgroundColor: '#1e3a24', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  approveButtonText: { color: '#7ee787', fontSize: 12, fontWeight: '600' },
-  denyButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  denyButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  deleteButton: { backgroundColor: '#2a2a32', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  deleteButtonText: { color: '#9a9aa5', fontSize: 12, fontWeight: '600' },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 4 },
-});

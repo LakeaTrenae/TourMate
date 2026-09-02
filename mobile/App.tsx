@@ -7,8 +7,18 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
+import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
 
 import { AuthProvider, useAuth } from './lib/auth-context';
+import { ThemeProvider } from './lib/theme';
 import { AuthScreen } from './screens/AuthScreen';
 import { ResetPasswordScreen } from './screens/ResetPasswordScreen';
 import { MfaChallengeScreen } from './screens/MfaChallengeScreen';
@@ -154,12 +164,37 @@ function RootNavigator() {
 }
 
 export default function App() {
+  // The Load-In design system's three families — see lib/theme.tsx for
+  // where these get mapped to semantic names (fonts.displayBold, etc.).
+  // Blocking on this (rather than falling back to system fonts while
+  // loading) avoids a flash of the wrong typeface on every cold start,
+  // same reasoning as the session/profile loading gate below.
+  const [fontsLoaded] = useFonts({
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0b0e13', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="#fff" />
+      </View>
+    );
+  }
+
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-      <StatusBar style="auto" />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+        <StatusBar style="auto" />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

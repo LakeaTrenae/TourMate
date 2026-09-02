@@ -7,6 +7,9 @@
  * document's title, let alone its file. Opening a file gets a short-lived
  * signed URL (the bucket is private) rather than a permanent public link,
  * so a URL that leaks or gets cached somewhere doesn't stay valid forever.
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,6 +27,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Documents'>;
@@ -51,9 +55,17 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 const CATEGORY_ORDER: Category[] = ['general', 'contract', 'rider', 'hospitality', 'itinerary', 'other'];
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function DocumentsScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [isManager, setIsManager] = useState(false);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -141,12 +153,48 @@ export function DocumentsScreen({ route, navigation }: Props) {
     () => (activeCategory ? docs.filter((d) => d.category === activeCategory) : docs),
     [docs, activeCategory]
   );
+  const rows = useMemo(() => chunkPairs(filteredDocs), [filteredDocs]);
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
+    );
+  }
+
+  function renderDocCard(doc: Doc) {
+    return (
+      <Pressable
+        key={doc.id}
+        style={styles.card}
+        onPress={() => openDocument(doc)}
+        onLongPress={isManager ? () => confirmDelete(doc) : undefined}
+      >
+        <Text style={styles.eyebrow}>
+          {CATEGORY_LABELS[doc.category].toUpperCase()}
+          {doc.visibility === 'managers_only' ? ' · MANAGERS ONLY' : ''}
+        </Text>
+        <Text style={styles.docTitle} numberOfLines={2}>
+          {doc.title}
+        </Text>
+        <Text style={styles.docMeta}>
+          {new Date(doc.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          {doc.artist ? ` · ${doc.artist.name}` : ''}
+        </Text>
+        <View style={styles.cardFooter}>
+          {isManager && (
+            <Pressable onPress={() => navigation.navigate('DocumentSharing', { documentId: doc.id, tourId, docTitle: doc.title })}>
+              <Text style={styles.shareLink}>Share ›</Text>
+            </Pressable>
+          )}
+          {isManager && (
+            <Pressable style={styles.deleteButton} onPress={() => confirmDelete(doc)}>
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </Pressable>
+          )}
+        </View>
+      </Pressable>
     );
   }
 
@@ -180,7 +228,7 @@ export function DocumentsScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={filteredDocs.length === 0 && styles.emptyContainer}
       >
         {filteredDocs.length === 0 ? (
@@ -188,38 +236,11 @@ export function DocumentsScreen({ route, navigation }: Props) {
             {isManager ? 'No documents yet.' : 'No documents shared with you yet.'}
           </Text>
         ) : (
-          filteredDocs.map((doc) => (
-            <Pressable
-              key={doc.id}
-              style={styles.card}
-              onPress={() => openDocument(doc)}
-              onLongPress={isManager ? () => confirmDelete(doc) : undefined}
-            >
-              <View style={styles.docInfo}>
-                <Text style={styles.docTitle}>{doc.title}</Text>
-                <Text style={styles.docMeta}>
-                  {CATEGORY_LABELS[doc.category]} ·{' '}
-                  {new Date(doc.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  {doc.visibility === 'managers_only' ? ' · Managers only' : ''}
-                  {doc.artist ? ` · ${doc.artist.name}` : ''}
-                </Text>
-                {isManager && (
-                  <Pressable
-                    onPress={() => navigation.navigate('DocumentSharing', { documentId: doc.id, tourId, docTitle: doc.title })}
-                  >
-                    <Text style={styles.shareLink}>Share ›</Text>
-                  </Pressable>
-                )}
-              </View>
-              <View style={styles.cardActions}>
-                {isManager && (
-                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(doc)}>
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </Pressable>
-                )}
-                <Text style={styles.openArrow}>›</Text>
-              </View>
-            </Pressable>
+          rows.map((row, i) => (
+            <View key={row.map((d) => d.id).join('-') || i} style={styles.row}>
+              {row.map(renderDocCard)}
+              {row.length === 1 && <View style={styles.rowSpacer} />}
+            </View>
           ))
         )}
         {isManager && filteredDocs.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a document) to remove it.</Text>}
@@ -228,39 +249,44 @@ export function DocumentsScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  chipRow: { flexGrow: 0, marginBottom: 12 },
-  chipRowContent: { gap: 8, paddingRight: 8 },
-  chip: { backgroundColor: '#1a1a20', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7 },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-  docTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  docInfo: { flex: 1 },
-  docMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-  shareLink: { color: '#7c9cff', fontSize: 12, fontWeight: '600', marginTop: 6 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  openArrow: { color: '#6b6b76', fontSize: 18 },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipRow: { flexGrow: 0, marginBottom: 12 },
+    chipRowContent: { gap: 8, paddingRight: 8 },
+    chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7 },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    rowSpacer: { flex: 1 },
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    eyebrow: { color: colors.textDim, fontSize: 9, fontFamily: fonts.mono, letterSpacing: 0.4, marginBottom: 7 },
+    docTitle: { color: colors.text, fontSize: 14.5, fontFamily: fonts.displaySemiBold, marginBottom: 7, lineHeight: 18 },
+    docMeta: { color: colors.textDim, fontSize: 10.5, fontFamily: fonts.mono },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+    shareLink: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+    deleteButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+  });
+}

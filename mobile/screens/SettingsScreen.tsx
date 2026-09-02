@@ -30,6 +30,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { registerForPushNotifications } from '../lib/pushNotifications';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
+import { useTheme, type ThemePreference } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
@@ -39,6 +40,7 @@ type EnrollData = { factorId: string; secret: string; uri: string };
 
 export function SettingsScreen({ navigation }: Props) {
   const { session, profile, refreshProfile, signOut, refreshMfaStatus } = useAuth();
+  const { preference, setPreference } = useTheme();
 
   const [preferredName, setPreferredName] = useState(profile?.preferred_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -396,6 +398,21 @@ export function SettingsScreen({ navigation }: Props) {
         </Pressable>
       )}
 
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Appearance</Text>
+      <View style={styles.themeRow}>
+        {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => (
+          <Pressable
+            key={option}
+            style={[styles.themeOption, preference === option && styles.themeOptionActive]}
+            onPress={() => setPreference(option)}
+          >
+            <Text style={[styles.themeOptionText, preference === option && styles.themeOptionTextActive]}>
+              {option === 'system' ? 'System' : option === 'light' ? 'Light' : 'Dark'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Legal</Text>
       <Pressable style={styles.travelDocsRow} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
         <Text style={styles.travelDocsText}>Privacy Policy</Text>
@@ -479,6 +496,17 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   travelDocsText: { color: '#fff', fontSize: 14 },
+  themeRow: { flexDirection: 'row', gap: 8 },
+  themeOption: {
+    flex: 1,
+    backgroundColor: '#1a1a20',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  themeOptionActive: { backgroundColor: '#fff' },
+  themeOptionText: { color: '#9a9aa5', fontSize: 13, fontWeight: '600' },
+  themeOptionTextActive: { color: '#0b0b0f' },
   pushStatus: { color: '#7ee787', fontSize: 12, marginTop: 6, marginBottom: 6 },
   mfaSetupBox: { backgroundColor: '#1a1a20', borderRadius: 10, padding: 14 },
   mfaSetupLabel: { color: '#9a9aa5', fontSize: 12, marginBottom: 8 },

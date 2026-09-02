@@ -4,8 +4,11 @@
  * — a venue you play this year is worth keeping around for next year's
  * routing, which is why this lives off Settings' org list rather than any
  * single tour.
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -21,6 +24,7 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Venues'>;
@@ -36,8 +40,16 @@ type Venue = {
   longitude: number | null;
 };
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function VenuesScreen({ route, navigation }: Props) {
   const { organizationId, organizationName } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [venues, setVenues] = useState<Venue[]>([]);
   const [search, setSearch] = useState('');
@@ -92,12 +104,37 @@ export function VenuesScreen({ route, navigation }: Props) {
     if (!q) return true;
     return v.name.toLowerCase().includes(q) || (v.city ?? '').toLowerCase().includes(q);
   });
+  const rows = useMemo(() => chunkPairs(filtered), [filtered]);
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
+    );
+  }
+
+  function renderVenueCard(venue: Venue) {
+    return (
+      <Pressable
+        key={venue.id}
+        style={styles.card}
+        onPress={() => navigation.navigate('AddVenue', { organizationId, venueId: venue.id })}
+        onLongPress={() => confirmDelete(venue)}
+      >
+        <View style={styles.mark} />
+        <Text style={styles.venueName}>{venue.name}</Text>
+        <View style={styles.venueMetaRow}>
+          <Text style={styles.venueMeta} numberOfLines={1}>
+            {[venue.city, venue.state].filter(Boolean).join(', ') || 'No city set'}
+          </Text>
+          {venue.capacity && <Text style={styles.venueCapacity}>{venue.capacity.toLocaleString()} cap</Text>}
+        </View>
+        {!venue.latitude && <Text style={styles.notGeocoded}>Not geocoded</Text>}
+        <Pressable style={styles.deleteButton} onPress={() => confirmDelete(venue)}>
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </Pressable>
+      </Pressable>
     );
   }
 
@@ -116,7 +153,7 @@ export function VenuesScreen({ route, navigation }: Props) {
       <TextInput
         style={styles.search}
         placeholder="Search name or city"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={search}
         onChangeText={setSearch}
       />
@@ -124,31 +161,17 @@ export function VenuesScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={filtered.length === 0 && styles.emptyContainer}
       >
         {filtered.length === 0 ? (
           <Text style={styles.emptyText}>{search ? 'No venues match that search.' : 'No venues yet.'}</Text>
         ) : (
-          filtered.map((venue) => (
-            <Pressable
-              key={venue.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('AddVenue', { organizationId, venueId: venue.id })}
-              onLongPress={() => confirmDelete(venue)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.venueName}>{venue.name}</Text>
-                <Pressable style={styles.deleteButton} onPress={() => confirmDelete(venue)}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.venueMeta}>
-                {[venue.city, venue.state].filter(Boolean).join(', ') || 'No city set'}
-                {venue.capacity ? ` · Cap. ${venue.capacity.toLocaleString()}` : ''}
-              </Text>
-              {!venue.latitude && <Text style={styles.notGeocoded}>Not geocoded — no weather/route data yet</Text>}
-            </Pressable>
+          rows.map((row, i) => (
+            <View key={row.map((v) => v.id).join('-') || i} style={styles.row}>
+              {row.map(renderVenueCard)}
+              {row.length === 1 && <View style={styles.rowSpacer} />}
+            </View>
           ))
         )}
         {filtered.length > 0 && <Text style={styles.hint}>Tap to edit · tap Delete (or hold) to remove.</Text>}
@@ -157,32 +180,63 @@ export function VenuesScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  search: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: { backgroundColor: '#1a1a20', borderRadius: 12, padding: 16, marginBottom: 10 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  venueName: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  venueMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-  notGeocoded: { color: '#e8c274', fontSize: 11, marginTop: 6 },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    search: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    rowSpacer: { flex: 1 },
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    mark: {
+      height: 40,
+      borderRadius: 8,
+      marginBottom: 10,
+      backgroundColor: colors.accent2,
+    },
+    venueName: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold, marginBottom: 6 },
+    venueMetaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
+    venueMeta: { color: colors.textDim, fontSize: 11, fontFamily: fonts.mono, flexShrink: 1 },
+    venueCapacity: { color: colors.textDim, fontSize: 11, fontFamily: fonts.mono },
+    notGeocoded: { color: colors.warn, fontSize: 10, marginTop: 6, fontFamily: fonts.body },
+    deleteButton: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.dangerSoft,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginTop: 10,
+    },
+    deleteButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+  });
+}

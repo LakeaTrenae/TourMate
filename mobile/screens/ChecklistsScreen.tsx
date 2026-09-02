@@ -5,8 +5,11 @@
  * one feature backs every checklist instead of a separate screen per use
  * case (see 0021_security_hospitality_checklists.sql for the schema/RLS
  * this mirrors from schedule_items).
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -23,6 +26,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatDepartment } from '../lib/format';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checklists'>;
@@ -38,9 +42,17 @@ type Checklist = {
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function ChecklistsScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [isManager, setIsManager] = useState(false);
   const [ownDepartment, setOwnDepartment] = useState<string | null>(null);
@@ -142,11 +154,67 @@ export function ChecklistsScreen({ route, navigation }: Props) {
     ]);
   }
 
+  const rows = useMemo(() => chunkPairs(checklists), [checklists]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
+    );
+  }
+
+  function renderChecklistCard(c: Checklist) {
+    const editable = canEdit(c);
+    const hasItems = c.item_count > 0;
+    const pct = hasItems ? c.checked_count / c.item_count : 0;
+    const done = hasItems && c.checked_count === c.item_count;
+
+    return (
+      <Pressable
+        key={c.id}
+        style={styles.card}
+        onPress={() => navigation.navigate('ChecklistDetail', { checklistId: c.id, tourId, title: c.title })}
+        onLongPress={editable ? () => confirmDelete(c) : undefined}
+      >
+        <Text style={styles.eyebrow}>
+          {formatDepartment(c.department).toUpperCase()}
+          {!c.visible_to_all ? ' · DEPT ONLY' : ''}
+        </Text>
+        <Text style={styles.checklistTitle} numberOfLines={2}>
+          {c.title}
+        </Text>
+        {hasItems ? (
+          <>
+            <Text style={styles.stat}>
+              {c.checked_count}
+              <Text style={styles.statTotal}>/{c.item_count}</Text>
+            </Text>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.round(pct * 100)}%`, backgroundColor: done ? colors.success : colors.accent },
+                ]}
+              />
+            </View>
+          </>
+        ) : (
+          <Text style={styles.docMeta}>No items yet</Text>
+        )}
+        <View style={styles.cardFooter}>
+          {editable && (
+            <Pressable onPress={() => navigation.navigate('ChecklistSharing', { checklistId: c.id, tourId, checklistTitle: c.title })}>
+              <Text style={styles.shareLink}>Share ›</Text>
+            </Pressable>
+          )}
+          {editable && (
+            <Pressable style={styles.deleteButton} onPress={() => confirmDelete(c)}>
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </Pressable>
+          )}
+        </View>
+      </Pressable>
     );
   }
 
@@ -165,7 +233,7 @@ export function ChecklistsScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={checklists.length === 0 && styles.emptyContainer}
       >
         {checklists.length === 0 ? (
@@ -174,37 +242,11 @@ export function ChecklistsScreen({ route, navigation }: Props) {
             track.
           </Text>
         ) : (
-          checklists.map((c) => (
-            <Pressable
-              key={c.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('ChecklistDetail', { checklistId: c.id, tourId, title: c.title })}
-              onLongPress={canEdit(c) ? () => confirmDelete(c) : undefined}
-            >
-              <View>
-                <Text style={styles.checklistTitle}>{c.title}</Text>
-                <Text style={styles.checklistMeta}>
-                  {formatDepartment(c.department)}
-                  {!c.visible_to_all ? ' · Department only' : ''}
-                  {c.item_count > 0 ? ` · ${c.checked_count}/${c.item_count} done` : ' · No items yet'}
-                </Text>
-                {canEdit(c) && (
-                  <Pressable
-                    onPress={() => navigation.navigate('ChecklistSharing', { checklistId: c.id, tourId, checklistTitle: c.title })}
-                  >
-                    <Text style={styles.shareLink}>Share ›</Text>
-                  </Pressable>
-                )}
-              </View>
-              <View style={styles.cardActions}>
-                {canEdit(c) && (
-                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(c)}>
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </Pressable>
-                )}
-                <Text style={styles.openArrow}>›</Text>
-              </View>
-            </Pressable>
+          rows.map((row, i) => (
+            <View key={row.map((c) => c.id).join('-') || i} style={styles.row}>
+              {row.map(renderChecklistCard)}
+              {row.length === 1 && <View style={styles.rowSpacer} />}
+            </View>
           ))
         )}
         {checklists.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a checklist) to remove it.</Text>}
@@ -213,32 +255,42 @@ export function ChecklistsScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center', paddingHorizontal: 10 },
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-  checklistTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  checklistMeta: { color: '#6b6b76', fontSize: 12, marginTop: 4 },
-  shareLink: { color: '#7c9cff', fontSize: 12, fontWeight: '600', marginTop: 6 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  openArrow: { color: '#6b6b76', fontSize: 18 },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', paddingHorizontal: 10, fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    rowSpacer: { flex: 1 },
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    eyebrow: { color: colors.textDim, fontSize: 9, fontFamily: fonts.mono, letterSpacing: 0.4, marginBottom: 7 },
+    checklistTitle: { color: colors.text, fontSize: 14.5, fontFamily: fonts.displaySemiBold, marginBottom: 8, lineHeight: 18 },
+    stat: { color: colors.text, fontSize: 20, fontFamily: fonts.displayBold, marginBottom: 4 },
+    statTotal: { fontSize: 13, color: colors.textDim, fontFamily: fonts.body },
+    docMeta: { color: colors.textDim, fontSize: 10.5, fontFamily: fonts.mono },
+    progressTrack: { height: 3, borderRadius: 2, backgroundColor: colors.surface2, overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: 2 },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+    shareLink: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+    deleteButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+  });
+}

@@ -13,6 +13,11 @@
  * server-side. If this user isn't in `organization_members` or
  * `tour_members` for a given tour, that row never comes back over the
  * wire at all, regardless of what this screen's code does with it.
+ *
+ * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
+ * the "Load-In" design review — see lib/theme.tsx. SectionList has no
+ * numColumns option (that's FlatList-only), so each section's tours are
+ * pre-chunked into pairs and rendered as rows of up to two cards.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,6 +37,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { formatDateOnly, parseDateOnly } from '../lib/dates';
 import { useCachedLoad } from '../lib/useCachedLoad';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TourList'>;
@@ -73,7 +79,16 @@ function dateStatus(tour: TourRow, today: Date): DateStatus {
   return 'upcoming';
 }
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 export function TourListScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -203,7 +218,7 @@ export function TourListScreen({ navigation }: Props) {
 
     return groups
       .filter((g) => filterMode === 'all' || filterMode === g.status)
-      .map((g) => ({ title: g.title, data: byStatus[g.status] }))
+      .map((g) => ({ title: g.title, status: g.status, data: chunkPairs(byStatus[g.status]) }))
       .filter((section) => section.data.length > 0);
   }, [tours, search, filterMode]);
 
@@ -215,10 +230,33 @@ export function TourListScreen({ navigation }: Props) {
     return `${startLabel} – ${endLabel}`;
   }
 
+  function renderTourCard(item: TourRow, status: DateStatus) {
+    const isActive = status === 'in_progress';
+    const isUpcoming = status === 'upcoming';
+    const statusColor = isActive || isUpcoming ? colors.accent : colors.textFaint;
+    const statusLabel = isActive ? 'Active' : isUpcoming ? 'Upcoming' : 'Completed';
+
+    return (
+      <Pressable
+        key={item.id}
+        style={[styles.tourCard, isActive && styles.tourCardActive]}
+        onPress={() => navigation.navigate('TourDashboard', { tourId: item.id, tourName: item.name })}
+      >
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+        </View>
+        {item.organization && <Text style={styles.eyebrow}>{item.organization.name.toUpperCase()}</Text>}
+        <Text style={styles.tourName}>{item.name}</Text>
+        <Text style={styles.tourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
+      </Pressable>
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -229,13 +267,13 @@ export function TourListScreen({ navigation }: Props) {
         <Text style={styles.headerTitle}>Your Tours</Text>
         <View style={styles.headerActions}>
           <Pressable onPress={() => navigation.navigate('Season')}>
-            <Text style={styles.signOut}>Timeline</Text>
+            <Text style={styles.headerLink}>Timeline</Text>
           </Pressable>
           <Pressable onPress={handleCreateTour}>
             <Text style={styles.createButton}>+ Tour</Text>
           </Pressable>
           <Pressable onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.signOut}>Settings</Text>
+            <Text style={styles.headerLink}>Settings</Text>
           </Pressable>
         </View>
       </View>
@@ -243,7 +281,7 @@ export function TourListScreen({ navigation }: Props) {
       <TextInput
         style={styles.searchInput}
         placeholder="Search tours…"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={search}
         onChangeText={setSearch}
       />
@@ -278,8 +316,8 @@ export function TourListScreen({ navigation }: Props) {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        keyExtractor={(row, index) => row.map((t) => t.id).join('-') || `empty-${index}`}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={sections.length === 0 && styles.emptyContainer}
         ListEmptyComponent={
           <Text style={styles.emptyText}>
@@ -289,180 +327,206 @@ export function TourListScreen({ navigation }: Props) {
           </Text>
         }
         renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.tourCard}
-            onPress={() => navigation.navigate('TourDashboard', { tourId: item.id, tourName: item.name })}
-          >
-            <View style={styles.tourCardHeader}>
-              <Text style={styles.tourName}>{item.name}</Text>
-              {item.completed_at && <Text style={styles.completedBadge}>Completed</Text>}
-            </View>
-            {item.organization && <Text style={styles.orgName}>{item.organization.name}</Text>}
-            <Text style={styles.tourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
-          </Pressable>
+        renderItem={({ item, section }) => (
+          <View style={styles.row}>
+            {item.map((tour) => renderTourCard(tour, section.status))}
+            {item.length === 1 && <View style={styles.rowSpacer} />}
+          </View>
         )}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  createButton: {
-    color: '#7c9cff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  signOut: {
-    color: '#9a9aa5',
-    fontSize: 14,
-  },
-  searchInput: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterChip: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  filterChipActive: {
-    backgroundColor: '#fff',
-  },
-  filterChipText: {
-    color: '#9a9aa5',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: '#0b0b0f',
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  offlineBanner: {
-    color: '#e8c274',
-    fontSize: 12,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  lockedOrgBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#2a1f15',
-    borderWidth: 1,
-    borderColor: '#e8c274',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  lockedOrgText: {
-    color: '#e8c274',
-    fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-  },
-  lockedOrgArrow: {
-    color: '#e8c274',
-    fontSize: 18,
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: '#6b6b76',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    color: '#6b6b76',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  tourCard: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  tourCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tourName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  completedBadge: {
-    color: '#6b6b76',
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    backgroundColor: '#0b0b0f',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  orgName: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  tourDates: {
-    color: '#6b6b76',
-    fontSize: 13,
-    marginTop: 6,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      paddingTop: 60,
+      paddingHorizontal: 20,
+    },
+    centered: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    headerTitle: {
+      color: colors.text,
+      fontSize: 28,
+      fontFamily: fonts.displayBlack,
+      letterSpacing: -0.5,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    createButton: {
+      color: colors.accent,
+      fontSize: 14,
+      fontFamily: fonts.bodySemiBold,
+    },
+    headerLink: {
+      color: colors.textDim,
+      fontSize: 14,
+      fontFamily: fonts.bodyMedium,
+    },
+    searchInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    filterRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 16,
+    },
+    filterChip: {
+      backgroundColor: colors.surface2,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    filterChipActive: {
+      backgroundColor: colors.accent,
+    },
+    filterChipText: {
+      color: colors.textDim,
+      fontSize: 12,
+      fontFamily: fonts.bodySemiBold,
+    },
+    filterChipTextActive: {
+      color: colors.onAccent,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginBottom: 12,
+      fontFamily: fonts.body,
+    },
+    offlineBanner: {
+      color: colors.warn,
+      fontSize: 12,
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: fonts.body,
+    },
+    lockedOrgBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.warnSoft,
+      borderWidth: 1,
+      borderColor: colors.warn,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+    },
+    lockedOrgText: {
+      color: colors.warn,
+      fontSize: 14,
+      fontFamily: fonts.bodySemiBold,
+      flex: 1,
+    },
+    lockedOrgArrow: {
+      color: colors.warn,
+      fontSize: 18,
+    },
+    emptyContainer: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    emptyText: {
+      color: colors.textFaint,
+      fontSize: 14,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+      fontFamily: fonts.body,
+    },
+    sectionHeader: {
+      color: colors.textDim,
+      fontSize: 11,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 10,
+      marginTop: 14,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 10,
+    },
+    rowSpacer: {
+      flex: 1,
+    },
+    tourCard: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    tourCardActive: {
+      borderTopWidth: 2,
+      borderTopColor: colors.accent,
+      paddingTop: 12,
+    },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 8,
+    },
+    statusDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 3,
+    },
+    statusText: {
+      fontSize: 9,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    eyebrow: {
+      color: colors.textDim,
+      fontSize: 9,
+      fontFamily: fonts.mono,
+      letterSpacing: 0.4,
+      marginBottom: 6,
+    },
+    tourName: {
+      color: colors.text,
+      fontSize: 16,
+      fontFamily: fonts.displaySemiBold,
+      marginBottom: 6,
+      lineHeight: 19,
+    },
+    tourDates: {
+      color: colors.textDim,
+      fontSize: 11,
+      fontFamily: fonts.mono,
+    },
+  });
+}
