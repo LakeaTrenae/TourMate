@@ -7,8 +7,11 @@
  *
  * `settlements` is trigger-bearing (completion-lock), so writes follow
  * the newId()-and-no-.select() convention from lib/ids.ts.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -18,13 +21,17 @@ import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
 import { parseOptionalNumber } from '../lib/numbers';
 import { logAuditEvent } from '../lib/auditLog';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settlement'>;
+type Styles = ReturnType<typeof createStyles>;
 
 export function SettlementScreen({ route }: Props) {
   const { tourId, tourDateId, tourDateLabel } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [settlementId, setSettlementId] = useState<string | null>(null);
   const [guarantee, setGuarantee] = useState('');
@@ -155,7 +162,7 @@ export function SettlementScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -169,6 +176,8 @@ export function SettlementScreen({ route }: Props) {
 
       <View style={styles.row}>
         <Field
+          styles={styles}
+          colors={colors}
           label="Guarantee ($)"
           value={guarantee}
           onChange={(v) => {
@@ -177,6 +186,8 @@ export function SettlementScreen({ route }: Props) {
           }}
         />
         <Field
+          styles={styles}
+          colors={colors}
           label="Ticket count"
           value={ticketCount}
           onChange={(v) => {
@@ -187,6 +198,8 @@ export function SettlementScreen({ route }: Props) {
       </View>
       <View style={styles.row}>
         <Field
+          styles={styles}
+          colors={colors}
           label="Ticket price ($)"
           value={ticketPrice}
           onChange={(v) => {
@@ -195,6 +208,8 @@ export function SettlementScreen({ route }: Props) {
           }}
         />
         <Field
+          styles={styles}
+          colors={colors}
           label="Expenses ($)"
           value={expenses}
           onChange={(v) => {
@@ -208,7 +223,7 @@ export function SettlementScreen({ route }: Props) {
       <TextInput
         style={styles.input}
         placeholder="0.00"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={netToArtist}
         onChangeText={(v) => {
           setNetToArtist(v);
@@ -222,49 +237,66 @@ export function SettlementScreen({ route }: Props) {
       <TextInput
         style={[styles.input, styles.notesInput]}
         placeholder="Adjustments, disputes, anything worth remembering"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={notes}
         onChangeText={setNotes}
         multiline
       />
 
       <Pressable style={styles.saveButton} onPress={handleSave} disabled={saving}>
-        {saving ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveButtonText}>Save Settlement</Text>}
+        {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save Settlement</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  styles,
+  colors,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  styles: Styles;
+  colors: ThemeColors;
+}) {
   return (
     <View style={styles.fieldFlex}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} placeholder="0" placeholderTextColor="#6b6b76" value={value} onChangeText={onChange} keyboardType="decimal-pad" />
+      <TextInput style={styles.input} placeholder="0" placeholderTextColor={colors.textFaint} value={value} onChangeText={onChange} keyboardType="decimal-pad" />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  row: { flexDirection: 'row', gap: 10 },
-  fieldFlex: { flex: 1 },
-  fieldLabel: { color: '#9a9aa5', fontSize: 12, marginBottom: 6, marginTop: 8 },
-  input: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  notesInput: { minHeight: 80, textAlignVertical: 'top' },
-  hint: { color: '#6b6b76', fontSize: 11, marginBottom: 4 },
-  saveButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  saveButtonText: { color: '#0b0b0f', fontSize: 16, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10 },
+    fieldFlex: { flex: 1 },
+    fieldLabel: { color: colors.textDim, fontSize: 12, marginBottom: 6, marginTop: 8, fontFamily: fonts.body },
+    input: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      fontFamily: fonts.mono,
+      marginBottom: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    notesInput: { minHeight: 80, textAlignVertical: 'top', fontFamily: fonts.body },
+    hint: { color: colors.textFaint, fontSize: 11, marginBottom: 4, fontFamily: fonts.body },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+    saveButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+  });
+}

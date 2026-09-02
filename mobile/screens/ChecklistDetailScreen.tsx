@@ -9,8 +9,11 @@
  * enforced server-side by can_edit_checklist (0021) — this screen shows
  * the controls to everyone and lets RLS reject an unauthorized write
  * rather than trying to perfectly predict the rule client-side.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -28,6 +31,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChecklistDetail'>;
@@ -42,6 +46,8 @@ type Item = {
 export function ChecklistDetailScreen({ route }: Props) {
   const { checklistId, title } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState('');
@@ -151,7 +157,7 @@ export function ChecklistDetailScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -160,7 +166,7 @@ export function ChecklistDetailScreen({ route }: Props) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
     >
       <Text style={styles.title}>{title}</Text>
       {items.length > 0 && (
@@ -197,14 +203,14 @@ export function ChecklistDetailScreen({ route }: Props) {
         <TextInput
           style={styles.addItemInput}
           placeholder="Add an item…"
-          placeholderTextColor="#6b6b76"
+          placeholderTextColor={colors.textFaint}
           value={newItemText}
           onChangeText={setNewItemText}
           onSubmitEditing={handleAddItem}
           returnKeyType="done"
         />
         <Pressable style={styles.addItemButton} onPress={handleAddItem} disabled={addingItem || !newItemText.trim()}>
-          {addingItem ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.addItemButtonText}>Add</Text>}
+          {addingItem ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.addItemButtonText}>Add</Text>}
         </Pressable>
       </View>
 
@@ -213,7 +219,7 @@ export function ChecklistDetailScreen({ route }: Props) {
       <TextInput
         style={styles.notesInput}
         placeholder="Nothing noted yet…"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={notes}
         onChangeText={setNotes}
         multiline
@@ -221,75 +227,83 @@ export function ChecklistDetailScreen({ route }: Props) {
       />
       {notesDirty && (
         <Pressable style={styles.saveNotesButton} onPress={handleSaveNotes} disabled={savingNotes}>
-          {savingNotes ? <ActivityIndicator color="#0b0b0f" /> : <Text style={styles.saveNotesButtonText}>Save Notes</Text>}
+          {savingNotes ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveNotesButtonText}>Save Notes</Text>}
         </Pressable>
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 60 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  progress: { color: '#6b6b76', fontSize: 13, marginTop: 4, marginBottom: 12 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyText: { color: '#6b6b76', fontSize: 14, marginTop: 12, marginBottom: 12 },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 14,
-    marginTop: 8,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#6b6b76',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  checkboxChecked: { backgroundColor: '#7ee787', borderColor: '#7ee787' },
-  checkmark: { color: '#0b0b0f', fontSize: 14, fontWeight: '700' },
-  itemText: { color: '#fff', fontSize: 14, flex: 1 },
-  itemTextChecked: { color: '#6b6b76', textDecorationLine: 'line-through' },
-  deleteButton: { paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 16, fontWeight: '700' },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-  addItemRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  addItemInput: {
-    flex: 1,
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-  },
-  addItemButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
-  },
-  addItemButtonText: { color: '#0b0b0f', fontSize: 14, fontWeight: '600' },
-  sectionTitle: { color: '#9a9aa5', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 28, marginBottom: 4 },
-  notesHint: { color: '#6b6b76', fontSize: 12, marginBottom: 8 },
-  notesInput: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  saveNotesButton: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
-  saveNotesButtonText: { color: '#0b0b0f', fontSize: 14, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    progress: { color: colors.textFaint, fontSize: 13, marginTop: 4, marginBottom: 12, fontFamily: fonts.mono },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 14, marginTop: 12, marginBottom: 12, fontFamily: fonts.body },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 14,
+      marginTop: 8,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.textFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    checkboxChecked: { backgroundColor: colors.success, borderColor: colors.success },
+    checkmark: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodyBold },
+    itemText: { color: colors.text, fontSize: 14, flex: 1, fontFamily: fonts.body },
+    itemTextChecked: { color: colors.textFaint, textDecorationLine: 'line-through' },
+    deleteButton: { paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+    deleteButtonText: { color: colors.danger, fontSize: 16, fontFamily: fonts.bodyBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+    addItemRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+    addItemInput: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    addItemButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingHorizontal: 18,
+      justifyContent: 'center',
+    },
+    addItemButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 28, marginBottom: 4 },
+    notesHint: { color: colors.textFaint, fontSize: 12, marginBottom: 8, fontFamily: fonts.body },
+    notesInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      minHeight: 110,
+      textAlignVertical: 'top',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    saveNotesButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+    saveNotesButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+  });
+}
