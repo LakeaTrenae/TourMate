@@ -9,6 +9,9 @@
  * other roster view in the app already uses, gated the same way by
  * "tour_members readable by fellow tour members" (0002_policy_gaps.sql)
  * and "profiles readable by fellow tour or org members" (0011).
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -28,6 +31,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatRole, formatDepartment } from '../lib/format';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Directory'>;
@@ -56,6 +60,8 @@ const DEPARTMENT_ORDER = [
 export function DirectoryScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [people, setPeople] = useState<Person[]>([]);
   const [isManager, setIsManager] = useState(false);
@@ -127,7 +133,7 @@ export function DirectoryScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -142,7 +148,7 @@ export function DirectoryScreen({ route, navigation }: Props) {
       <TextInput
         style={styles.search}
         placeholder="Search name or email"
-        placeholderTextColor="#6b6b76"
+        placeholderTextColor={colors.textFaint}
         value={search}
         onChangeText={setSearch}
         autoCapitalize="none"
@@ -173,7 +179,7 @@ export function DirectoryScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={grouped.length === 0 && styles.emptyContainer}
       >
         {grouped.length === 0 ? (
@@ -230,51 +236,62 @@ export function DirectoryScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: 12 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  search: {
-    backgroundColor: '#1a1a20',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  chipRow: { flexGrow: 0, marginBottom: 12 },
-  chipRowContent: { gap: 8, paddingRight: 8 },
-  chip: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  chipActive: { backgroundColor: '#fff' },
-  chipText: { color: '#9a9aa5', fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#0b0b0f' },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  group: { marginBottom: 18 },
-  groupTitle: {
-    color: '#9a9aa5',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  card: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
-  },
-  name: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  role: { color: '#6b6b76', fontSize: 12, marginTop: 2 },
-  contactLink: { color: '#7c9cff', fontSize: 13, marginTop: 4 },
-  passportLink: { color: '#9a9aa5', fontSize: 12, marginTop: 6 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { marginBottom: 12 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    search: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: fonts.body,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipRow: { flexGrow: 0, marginBottom: 12 },
+    chipRowContent: { gap: 8, paddingRight: 8 },
+    chip: {
+      backgroundColor: colors.surface2,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    chipActive: { backgroundColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    group: { marginBottom: 18 },
+    groupTitle: {
+      color: colors.textDim,
+      fontSize: 12,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: 8,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    name: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold },
+    role: { color: colors.textFaint, fontSize: 12, marginTop: 2, fontFamily: fonts.body },
+    contactLink: { color: colors.accent, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
+    passportLink: { color: colors.textDim, fontSize: 12, marginTop: 6, fontFamily: fonts.body },
+  });
+}

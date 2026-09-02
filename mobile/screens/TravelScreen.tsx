@@ -8,6 +8,9 @@
  * (see "flights readable by assigned passenger" in 0001_init.sql) — this
  * screen doesn't need an if/else for that, the data just arrives already
  * scoped.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -25,6 +28,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Travel'>;
@@ -48,6 +52,8 @@ const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 export function TravelScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [isManager, setIsManager] = useState(false);
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -135,7 +141,7 @@ export function TravelScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -157,7 +163,7 @@ export function TravelScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={sortedFlights.length === 0 && styles.emptyContainer}
       >
         {sortedFlights.length === 0 ? (
@@ -220,129 +226,144 @@ export function TravelScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#6b6b76',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  addButton: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  addButtonText: {
-    color: '#0b0b0f',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: '#6b6b76',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  card: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 12, fontWeight: '600' },
-  airline: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  status: {
-    color: '#e8c274',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  route: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  leg: {
-    flex: 1,
-  },
-  airport: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  time: {
-    color: '#9a9aa5',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  arrow: {
-    color: '#6b6b76',
-    fontSize: 16,
-    marginHorizontal: 10,
-  },
-  confirmation: {
-    color: '#6b6b76',
-    fontSize: 12,
-    marginTop: 10,
-  },
-  passengers: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a32',
-    paddingTop: 10,
-  },
-  passenger: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  hint: {
-    color: '#6b6b76',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      paddingTop: 20,
+      paddingHorizontal: 20,
+    },
+    centered: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 26,
+      fontFamily: fonts.displayBlack,
+      letterSpacing: -0.4,
+    },
+    subtitle: {
+      color: colors.textDim,
+      fontSize: 13,
+      marginTop: 2,
+      fontFamily: fonts.body,
+    },
+    addButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    addButtonText: {
+      color: colors.onAccent,
+      fontSize: 13,
+      fontFamily: fonts.bodySemiBold,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginBottom: 12,
+      fontFamily: fonts.body,
+    },
+    emptyContainer: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    emptyText: {
+      color: colors.textFaint,
+      fontSize: 14,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+      fontFamily: fonts.body,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+    deleteButtonText: { color: colors.danger, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    airline: {
+      color: colors.text,
+      fontSize: 15,
+      fontFamily: fonts.displaySemiBold,
+    },
+    status: {
+      color: colors.warn,
+      fontSize: 12,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+    },
+    route: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    leg: {
+      flex: 1,
+    },
+    airport: {
+      color: colors.text,
+      fontSize: 18,
+      fontFamily: fonts.displayBold,
+    },
+    time: {
+      color: colors.textDim,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: fonts.mono,
+    },
+    arrow: {
+      color: colors.textFaint,
+      fontSize: 16,
+      marginHorizontal: 10,
+    },
+    confirmation: {
+      color: colors.textFaint,
+      fontSize: 12,
+      marginTop: 10,
+      fontFamily: fonts.mono,
+    },
+    passengers: {
+      marginTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 10,
+    },
+    passenger: {
+      color: colors.textDim,
+      fontSize: 13,
+      marginTop: 2,
+      fontFamily: fonts.body,
+    },
+    hint: {
+      color: colors.textFaint,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 8,
+      fontFamily: fonts.body,
+    },
+  });
+}

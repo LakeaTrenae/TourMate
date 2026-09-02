@@ -8,6 +8,9 @@
  * ever reachable by managers in the first place (TourDashboardScreen
  * hides the entry point for everyone else), but that's UI convenience on
  * top of the real guarantee, not the guarantee itself.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +29,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { logAuditEvent } from '../lib/auditLog';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Budget'>;
@@ -43,6 +47,8 @@ type BudgetItem = {
 export function BudgetScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [items, setItems] = useState<BudgetItem[]>([]);
   const [settlementsTotal, setSettlementsTotal] = useState<number | null>(null);
@@ -146,7 +152,7 @@ export function BudgetScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -166,15 +172,15 @@ export function BudgetScreen({ route, navigation }: Props) {
       <View style={styles.summary}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Income</Text>
-          <Text style={[styles.summaryValue, { color: '#7ee787' }]}>{formatCurrency(totals.income)}</Text>
+          <Text style={[styles.summaryValue, { color: colors.success }]}>{formatCurrency(totals.income)}</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Expenses</Text>
-          <Text style={[styles.summaryValue, { color: '#ff6b6b' }]}>{formatCurrency(totals.expense)}</Text>
+          <Text style={[styles.summaryValue, { color: colors.danger }]}>{formatCurrency(totals.expense)}</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Net</Text>
-          <Text style={[styles.summaryValue, { color: totals.net >= 0 ? '#7ee787' : '#ff6b6b' }]}>
+          <Text style={[styles.summaryValue, { color: totals.net >= 0 ? colors.success : colors.danger }]}>
             {formatCurrency(totals.net)}
           </Text>
         </View>
@@ -183,7 +189,7 @@ export function BudgetScreen({ route, navigation }: Props) {
       {settlementsTotal !== null && settlementsTotal !== 0 && (
         <View style={styles.settlementsCard}>
           <Text style={styles.settlementsLabel}>Settlements (separate from the manual entries below)</Text>
-          <Text style={[styles.settlementsValue, { color: settlementsTotal >= 0 ? '#7ee787' : '#ff6b6b' }]}>
+          <Text style={[styles.settlementsValue, { color: settlementsTotal >= 0 ? colors.success : colors.danger }]}>
             {formatCurrency(settlementsTotal)} net to artist
           </Text>
         </View>
@@ -192,7 +198,7 @@ export function BudgetScreen({ route, navigation }: Props) {
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
         contentContainerStyle={items.length === 0 && styles.emptyContainer}
       >
         {items.length === 0 ? (
@@ -212,7 +218,7 @@ export function BudgetScreen({ route, navigation }: Props) {
                 {item.receipt_path && <Text style={styles.receiptLink}>📎 Receipt</Text>}
               </View>
               <View style={styles.cardActions}>
-                <Text style={[styles.amount, { color: item.entry_type === 'income' ? '#7ee787' : '#ff6b6b' }]}>
+                <Text style={[styles.amount, { color: item.entry_type === 'income' ? colors.success : colors.danger }]}>
                   {item.entry_type === 'income' ? '+' : '−'}
                   {formatCurrency(Math.abs(item.amount))}
                 </Text>
@@ -229,52 +235,59 @@ export function BudgetScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', paddingTop: 20, paddingHorizontal: 20 },
-  centered: { flex: 1, backgroundColor: '#0b0b0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  subtitle: { color: '#6b6b76', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addButtonText: { color: '#0b0b0f', fontSize: 13, fontWeight: '600' },
-  summary: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a20',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-  },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryLabel: { color: '#6b6b76', fontSize: 11, textTransform: 'uppercase' },
-  summaryValue: { fontSize: 15, fontWeight: '700', marginTop: 4 },
-  settlementsCard: {
-    backgroundColor: '#15151a',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2a2a32',
-    padding: 12,
-    marginBottom: 16,
-  },
-  settlementsLabel: { color: '#6b6b76', fontSize: 11, textTransform: 'uppercase' },
-  settlementsValue: { fontSize: 14, fontWeight: '700', marginTop: 4 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { color: '#6b6b76', fontSize: 14, textAlign: 'center' },
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
-  },
-  category: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  description: { color: '#6b6b76', fontSize: 12, marginTop: 2 },
-  receiptLink: { color: '#7c9cff', fontSize: 12, marginTop: 4, fontWeight: '600' },
-  cardActions: { alignItems: 'flex-end', gap: 6 },
-  amount: { fontSize: 15, fontWeight: '700' },
-  deleteButton: { backgroundColor: '#3a1e1e', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  deleteButtonText: { color: '#ff6b6b', fontSize: 11, fontWeight: '600' },
-  hint: { color: '#6b6b76', fontSize: 12, textAlign: 'center', marginTop: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    summary: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 16,
+    },
+    summaryItem: { flex: 1, alignItems: 'center' },
+    summaryLabel: { color: colors.textFaint, fontSize: 11, textTransform: 'uppercase', fontFamily: fonts.body },
+    summaryValue: { fontSize: 16, fontFamily: fonts.displayBold, marginTop: 4 },
+    settlementsCard: {
+      backgroundColor: colors.surface2,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 12,
+      marginBottom: 16,
+    },
+    settlementsLabel: { color: colors.textFaint, fontSize: 11, textTransform: 'uppercase', fontFamily: fonts.body },
+    settlementsValue: { fontSize: 14, fontFamily: fonts.displayBold, marginTop: 4 },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    card: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    category: { color: colors.text, fontSize: 14, fontFamily: fonts.displaySemiBold },
+    description: { color: colors.textDim, fontSize: 12, marginTop: 2, fontFamily: fonts.body },
+    receiptLink: { color: colors.accent, fontSize: 12, marginTop: 4, fontFamily: fonts.bodySemiBold },
+    cardActions: { alignItems: 'flex-end', gap: 6 },
+    amount: { fontSize: 15, fontFamily: fonts.monoMedium },
+    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+    deleteButtonText: { color: colors.danger, fontSize: 11, fontFamily: fonts.bodySemiBold },
+    hint: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.body },
+  });
+}

@@ -12,6 +12,11 @@
  * here is UI-level: hiding the Budget entry point for non-managers so
  * crew aren't shown a dead end, not enforcing the restriction (RLS
  * already does that even if this check were somehow bypassed).
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx. Section/NavRow are module-level helpers,
+ * so they take the computed `styles` as a prop rather than closing over
+ * a module-level StyleSheet the way the pre-theme version did.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -34,6 +39,7 @@ import { formatRole, formatDepartment } from '../lib/format';
 import { newId } from '../lib/ids';
 import { buildTourIcs } from '../lib/ics';
 import { useCachedLoad } from '../lib/useCachedLoad';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TourDashboard'>;
@@ -64,9 +70,13 @@ type DashboardData = {
   members: TourMemberRow[];
 };
 
+type Styles = ReturnType<typeof createStyles>;
+
 export function TourDashboardScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -233,15 +243,16 @@ export function TourDashboardScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
 
-  return (<ScrollView
+  return (
+    <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#fff" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
     >
       <Text style={styles.tourName}>{tourName}</Text>
       {effectiveRole && (
@@ -268,6 +279,7 @@ export function TourDashboardScreen({ route, navigation }: Props) {
 
       <Section
         title="Schedule"
+        styles={styles}
         action={
           <View style={styles.sectionActionRow}>
             <Pressable onPress={handleExportCalendar} disabled={exporting}>
@@ -316,6 +328,7 @@ export function TourDashboardScreen({ route, navigation }: Props) {
 
       <Section
         title="People"
+        styles={styles}
         action={
           <View style={styles.sectionActionRow}>
             <Pressable onPress={() => navigation.navigate('Directory', { tourId, tourName })}>
@@ -355,19 +368,19 @@ export function TourDashboardScreen({ route, navigation }: Props) {
         )}
       </Section>
 
-      <Section title="More">
-        <NavRow label="Directory" onPress={() => navigation.navigate('Directory', { tourId, tourName })} />
-        <NavRow label="Artists" onPress={() => navigation.navigate('Artists', { tourId, tourName })} />
-        <NavRow label="Travel" onPress={() => navigation.navigate('Travel', { tourId, tourName })} />
-        <NavRow label="Ground Transport" onPress={() => navigation.navigate('GroundTransport', { tourId, tourName })} />
-        <NavRow label="Route" onPress={() => navigation.navigate('Route', { tourId, tourName })} />
-        <NavRow label="Lodging" onPress={() => navigation.navigate('Lodging', { tourId, tourName })} />
-        <NavRow label="Guest List" onPress={() => navigation.navigate('GuestList', { tourId, tourName })} />
-        <NavRow label="Documents" onPress={() => navigation.navigate('Documents', { tourId, tourName })} />
-        <NavRow label="Checklists" onPress={() => navigation.navigate('Checklists', { tourId, tourName })} />
-        <NavRow label="Full Tour Export" onPress={() => navigation.navigate('TourExport', { tourId, tourName })} />
-        {isManager && <NavRow label="Budget" onPress={() => navigation.navigate('Budget', { tourId, tourName })} />}
-        {isManager && <NavRow label="Activity Log" onPress={() => navigation.navigate('AuditLog', { tourId, tourName })} />}
+      <Section title="More" styles={styles}>
+        <NavRow styles={styles} label="Directory" onPress={() => navigation.navigate('Directory', { tourId, tourName })} />
+        <NavRow styles={styles} label="Artists" onPress={() => navigation.navigate('Artists', { tourId, tourName })} />
+        <NavRow styles={styles} label="Travel" onPress={() => navigation.navigate('Travel', { tourId, tourName })} />
+        <NavRow styles={styles} label="Ground Transport" onPress={() => navigation.navigate('GroundTransport', { tourId, tourName })} />
+        <NavRow styles={styles} label="Route" onPress={() => navigation.navigate('Route', { tourId, tourName })} />
+        <NavRow styles={styles} label="Lodging" onPress={() => navigation.navigate('Lodging', { tourId, tourName })} />
+        <NavRow styles={styles} label="Guest List" onPress={() => navigation.navigate('GuestList', { tourId, tourName })} />
+        <NavRow styles={styles} label="Documents" onPress={() => navigation.navigate('Documents', { tourId, tourName })} />
+        <NavRow styles={styles} label="Checklists" onPress={() => navigation.navigate('Checklists', { tourId, tourName })} />
+        <NavRow styles={styles} label="Full Tour Export" onPress={() => navigation.navigate('TourExport', { tourId, tourName })} />
+        {isManager && <NavRow styles={styles} label="Budget" onPress={() => navigation.navigate('Budget', { tourId, tourName })} />}
+        {isManager && <NavRow styles={styles} label="Activity Log" onPress={() => navigation.navigate('AuditLog', { tourId, tourName })} />}
       </Section>
     </ScrollView>
   );
@@ -377,10 +390,12 @@ function Section({
   title,
   action,
   children,
+  styles,
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  styles: Styles;
 }) {
   return (
     <View style={styles.section}>
@@ -393,7 +408,7 @@ function Section({
   );
 }
 
-function NavRow({ label, onPress }: { label: string; onPress: () => void }) {
+function NavRow({ label, onPress, styles }: { label: string; onPress: () => void; styles: Styles }) {
   return (
     <Pressable style={styles.stubRow} onPress={onPress}>
       <Text style={styles.stubLabel}>{label}</Text>
@@ -402,157 +417,170 @@ function NavRow({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  tourName: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '700',
-  },
-  roleBadge: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  offlineBanner: {
-    color: '#e8c274',
-    fontSize: 12,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  lockBanner: {
-    backgroundColor: '#2a2314',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  lockBannerText: {
-    color: '#e8c274',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  emptyText: {
-    color: '#6b6b76',
-    fontSize: 13,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sectionActionRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  sectionAction: {
-    color: '#7c9cff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  dayGroup: {
-    marginBottom: 14,
-  },
-  dayLabel: {
-    color: '#9a9aa5',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  scheduleRow: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-  },
-  scheduleTime: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    width: 52,
-  },
-  scheduleInfo: {
-    flex: 1,
-  },
-  scheduleTitle: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  scheduleMeta: {
-    color: '#6b6b76',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  personRow: {
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-  },
-  personName: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  personMeta: {
-    color: '#9a9aa5',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  personContactLink: {
-    color: '#7c9cff',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  seeAllText: {
-    color: '#7c9cff',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  stubRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a20',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-  },
-  stubLabel: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  navArrow: {
-    color: '#6b6b76',
-    fontSize: 18,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    centered: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      paddingTop: 60,
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+    },
+    tourName: {
+      color: colors.text,
+      fontSize: 26,
+      fontFamily: fonts.displayBlack,
+      letterSpacing: -0.4,
+    },
+    roleBadge: {
+      color: colors.textDim,
+      fontSize: 13,
+      marginTop: 4,
+      marginBottom: 20,
+      fontFamily: fonts.body,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 13,
+      marginBottom: 12,
+      fontFamily: fonts.body,
+    },
+    offlineBanner: {
+      color: colors.warn,
+      fontSize: 12,
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: fonts.body,
+    },
+    lockBanner: {
+      backgroundColor: colors.warnSoft,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+    },
+    lockBannerText: {
+      color: colors.warn,
+      fontSize: 13,
+      lineHeight: 18,
+      fontFamily: fonts.body,
+    },
+    emptyText: {
+      color: colors.textFaint,
+      fontSize: 13,
+      fontFamily: fonts.body,
+    },
+    section: {
+      marginBottom: 28,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    sectionTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontFamily: fonts.displaySemiBold,
+    },
+    sectionActionRow: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    sectionAction: {
+      color: colors.accent,
+      fontSize: 13,
+      fontFamily: fonts.bodySemiBold,
+    },
+    dayGroup: {
+      marginBottom: 14,
+    },
+    dayLabel: {
+      color: colors.textDim,
+      fontSize: 13,
+      fontFamily: fonts.bodySemiBold,
+      marginBottom: 6,
+    },
+    scheduleRow: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 6,
+    },
+    scheduleTime: {
+      color: colors.text,
+      fontSize: 13,
+      fontFamily: fonts.monoMedium,
+      width: 52,
+    },
+    scheduleInfo: {
+      flex: 1,
+    },
+    scheduleTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: fonts.body,
+    },
+    scheduleMeta: {
+      color: colors.textFaint,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: fonts.body,
+    },
+    personRow: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 6,
+    },
+    personName: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: fonts.bodySemiBold,
+    },
+    personMeta: {
+      color: colors.textDim,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: fonts.body,
+    },
+    personContactLink: {
+      color: colors.accent,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: fonts.body,
+    },
+    seeAllText: {
+      color: colors.accent,
+      fontSize: 13,
+      fontFamily: fonts.bodySemiBold,
+      marginTop: 6,
+    },
+    stubRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 6,
+    },
+    stubLabel: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: fonts.body,
+    },
+    navArrow: {
+      color: colors.textFaint,
+      fontSize: 18,
+    },
+  });
+}
