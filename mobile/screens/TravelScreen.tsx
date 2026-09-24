@@ -43,6 +43,8 @@ type Flight = {
   arrival_airport: string;
   arrival_time: string;
   status: string | null;
+  status_detail: string | null;
+  status_checked_at: string | null;
 };
 
 type PassengerRow = { flight_id: string; user_id: string; seat: string | null; profile: { display_name: string } | null };
@@ -60,6 +62,7 @@ export function TravelScreen({ route, navigation }: Props) {
   const [passengersByFlight, setPassengersByFlight] = useState<Record<string, PassengerRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function load() {
@@ -73,7 +76,9 @@ export function TravelScreen({ route, navigation }: Props) {
 
     const { data: flightRows, error: flightError } = await supabase
       .from('flights')
-      .select('id, airline, flight_number, confirmation_code, departure_airport, departure_time, arrival_airport, arrival_time, status')
+      .select(
+        'id, airline, flight_number, confirmation_code, departure_airport, departure_time, arrival_airport, arrival_time, status, status_detail, status_checked_at'
+      )
       .eq('tour_id', tourId)
       .order('departure_time', { ascending: true });
     if (flightError) {
@@ -121,6 +126,18 @@ export function TravelScreen({ route, navigation }: Props) {
     setRefreshing(false);
   }
 
+  async function handleCheckStatus(flightId: string) {
+    setErrorMessage(null);
+    setCheckingStatusId(flightId);
+    const { data, error } = await supabase.functions.invoke('flight-status', { body: { flightId } });
+    setCheckingStatusId(null);
+    if (error || data?.error) {
+      setErrorMessage(data?.error ?? error?.message ?? 'Failed to check flight status.');
+      return;
+    }
+    await load();
+  }
+
   function confirmDelete(flight: Flight) {
     Alert.alert('Delete this flight?', `${flight.airline ?? 'Flight'} ${flight.flight_number ?? ''}`.trim(), [
       { text: 'Cancel', style: 'cancel' },
@@ -154,9 +171,14 @@ export function TravelScreen({ route, navigation }: Props) {
           <Text style={styles.subtitle}>{tourName}</Text>
         </View>
         {isManager && (
-          <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddFlight', { tourId })}>
-            <Text style={styles.addButtonText}>+ Flight</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('ImportTripit', { tourId })}>
+              <Text style={styles.secondaryButtonText}>TripIt</Text>
+            </Pressable>
+            <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddFlight', { tourId })}>
+              <Text style={styles.addButtonText}>+ Flight</Text>
+            </Pressable>
+          </View>
         )}
       </View>
 
@@ -184,7 +206,7 @@ export function TravelScreen({ route, navigation }: Props) {
                   {flight.airline ?? 'Flight'} {flight.flight_number ?? ''}
                 </Text>
                 <View style={styles.cardHeaderRight}>
-                  {flight.status && <Text style={styles.status}>{flight.status}</Text>}
+                  {(flight.status_detail ?? flight.status) && <Text style={styles.status}>{flight.status_detail ?? flight.status}</Text>}
                   {isManager && (
                     <Pressable style={styles.deleteButton} onPress={() => confirmDelete(flight)}>
                       <Text style={styles.deleteButtonText}>Delete</Text>
@@ -207,6 +229,19 @@ export function TravelScreen({ route, navigation }: Props) {
 
               {flight.confirmation_code && (
                 <Text style={styles.confirmation}>Confirmation: {flight.confirmation_code}</Text>
+              )}
+
+              {flight.flight_number && (
+                <Pressable style={styles.refreshRow} onPress={() => handleCheckStatus(flight.id)} disabled={checkingStatusId === flight.id}>
+                  {checkingStatusId === flight.id ? (
+                    <ActivityIndicator color={colors.accent} size="small" />
+                  ) : (
+                    <Text style={styles.refreshText}>
+                      ↻ Refresh live status
+                      {flight.status_checked_at ? ` · checked ${formatDateTime(flight.status_checked_at)}` : ''}
+                    </Text>
+                  )}
+                </Pressable>
               )}
 
               <View style={styles.passengers}>
@@ -258,6 +293,7 @@ function createStyles(colors: ThemeColors) {
       marginTop: 2,
       fontFamily: fonts.body,
     },
+    headerActions: { flexDirection: 'row', gap: 8 },
     addButton: {
       backgroundColor: colors.accent,
       borderRadius: 8,
@@ -269,6 +305,14 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       fontFamily: fonts.bodySemiBold,
     },
+    secondaryButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    secondaryButtonText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
     error: {
       color: colors.danger,
       fontSize: 13,
@@ -346,6 +390,8 @@ function createStyles(colors: ThemeColors) {
       marginTop: 10,
       fontFamily: fonts.mono,
     },
+    refreshRow: { marginTop: 8, alignSelf: 'flex-start' },
+    refreshText: { color: colors.accent, fontSize: 11.5, fontFamily: fonts.bodySemiBold },
     passengers: {
       marginTop: 10,
       borderTopWidth: 1,

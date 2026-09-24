@@ -31,7 +31,7 @@ import {
   View,
 } from 'react-native';
 
-import { supabase } from '../lib/supabase';
+import { supabase, functionsUrl } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { registerForPushNotifications } from '../lib/pushNotifications';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
@@ -62,6 +62,11 @@ export function SettingsScreen({ navigation }: Props) {
   const [enrollCode, setEnrollCode] = useState('');
   const [mfaBusy, setMfaBusy] = useState(false);
   const [mfaStatus, setMfaStatus] = useState<string | null>(null);
+  const [calendarFeedToken, setCalendarFeedToken] = useState<string | null>(null);
+  const [tripitFeedUrl, setTripitFeedUrl] = useState('');
+  const [savedTripitFeedUrl, setSavedTripitFeedUrl] = useState('');
+  const [savingTripit, setSavingTripit] = useState(false);
+  const [rotatingToken, setRotatingToken] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useFocusEffect(
@@ -74,8 +79,65 @@ export function SettingsScreen({ navigation }: Props) {
           else setOrgs((data ?? []) as unknown as OrgMembership[]);
         });
       loadMfaFactors();
-    }, [])
+      if (session) {
+        supabase
+          .from('profiles')
+          .select('calendar_feed_token, tripit_feed_url')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            setCalendarFeedToken(data?.calendar_feed_token ?? null);
+            setTripitFeedUrl(data?.tripit_feed_url ?? '');
+            setSavedTripitFeedUrl(data?.tripit_feed_url ?? '');
+          });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session])
   );
+
+  // webcal:// (not https://) is what tells iOS/Android/desktop calendar
+  // apps to treat this as a live subscription to add, rather than a file
+  // to download — same URL, different scheme, same one-time-not-live
+  // distinction TourExportScreen's plain .ics share can't offer.
+  function handleSubscribeCalendar() {
+    if (!calendarFeedToken) return;
+    const feedUrl = functionsUrl('calendar-feed').replace(/^https?:\/\//, 'webcal://');
+    Linking.openURL(`${feedUrl}?token=${calendarFeedToken}`);
+  }
+
+  function confirmRotateToken() {
+    Alert.alert(
+      'Rotate your calendar feed link?',
+      'Your current subscription will stop updating — resubscribe with the new link afterward.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Rotate', style: 'destructive', onPress: handleRotateToken },
+      ]
+    );
+  }
+
+  async function handleRotateToken() {
+    setRotatingToken(true);
+    const { data, error } = await supabase.rpc('rotate_my_calendar_feed_token');
+    setRotatingToken(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setCalendarFeedToken(data);
+  }
+
+  async function handleSaveTripitUrl() {
+    if (!session) return;
+    setSavingTripit(true);
+    const { error } = await supabase.from('profiles').update({ tripit_feed_url: tripitFeedUrl.trim() || null }).eq('id', session.user.id);
+    setSavingTripit(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setSavedTripitFeedUrl(tripitFeedUrl);
+  }
 
   async function loadMfaFactors() {
     const { data, error } = await supabase.auth.mfa.listFactors();
@@ -320,6 +382,12 @@ export function SettingsScreen({ navigation }: Props) {
         {savingProfile ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save Profile</Text>}
       </Pressable>
 
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Billing</Text>
+      <Pressable style={styles.travelDocsRow} onPress={() => navigation.navigate('Billing')}>
+        <Text style={styles.travelDocsText}>Subscription</Text>
+        <Text style={styles.orgAction}>›</Text>
+      </Pressable>
+
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Organizations</Text>
       {orgs.length === 0 && <Text style={styles.emptyText}>Not part of any organization yet.</Text>}
       {orgs.map((o) => (
@@ -360,6 +428,38 @@ export function SettingsScreen({ navigation }: Props) {
         )}
       </Pressable>
       {pushStatus && <Text style={styles.pushStatus}>{pushStatus}</Text>}
+
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Calendar & Travel Import</Text>
+      <Pressable style={styles.travelDocsRow} onPress={handleSubscribeCalendar} disabled={!calendarFeedToken}>
+        <Text style={styles.travelDocsText}>Subscribe to Calendar</Text>
+        <Text style={styles.orgAction}>›</Text>
+      </Pressable>
+      <Text style={styles.notesHint}>
+        Adds a live calendar feed of every show you're on — stays synced automatically, unlike a one-time export.
+      </Text>
+      <Pressable onPress={confirmRotateToken} disabled={rotatingToken}>
+        {rotatingToken ? <ActivityIndicator color={colors.textDim} /> : <Text style={styles.rotateLink}>Rotate calendar link</Text>}
+      </Pressable>
+
+      <Text style={[styles.notesHint, styles.tripitLabel]}>
+        TripIt feed URL (from TripIt's "Sync to Calendar" settings) — lets TourMate import your flights and lodging.
+      </Text>
+      <View style={styles.inputRow}>
+        <TextInput
+          style={[styles.input, styles.rowInput]}
+          placeholder="webcal://www.tripit.com/feed/ical/private/..."
+          placeholderTextColor={colors.textFaint}
+          value={tripitFeedUrl}
+          onChangeText={setTripitFeedUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {tripitFeedUrl !== savedTripitFeedUrl && (
+          <Pressable style={styles.tripitSaveButton} onPress={handleSaveTripitUrl} disabled={savingTripit}>
+            {savingTripit ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.tripitSaveButtonText}>Save</Text>}
+          </Pressable>
+        )}
+      </View>
 
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Security</Text>
       {mfaStatus && <Text style={styles.pushStatus}>{mfaStatus}</Text>}
@@ -510,6 +610,13 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     travelDocsText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
+    notesHint: { color: colors.textFaint, fontSize: 12, marginTop: 6, marginBottom: 4, lineHeight: 16, fontFamily: fonts.body },
+    tripitLabel: { marginTop: 16 },
+    rotateLink: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold, marginTop: 4 },
+    inputRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+    rowInput: { flex: 1 },
+    tripitSaveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, justifyContent: 'center', height: 46 },
+    tripitSaveButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
     themeRow: { flexDirection: 'row', gap: 8 },
     themeOption: {
       flex: 1,

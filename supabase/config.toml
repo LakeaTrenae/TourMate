@@ -424,3 +424,11 @@ verify_jwt = false
 # supabase/functions/billing-daily-checks/index.ts.
 [functions.billing-daily-checks]
 verify_jwt = false
+
+# calendar-feed is polled directly by calendar apps (Google Calendar,
+# Apple Calendar, Outlook...) subscribing to a webcal:// URL — they send
+# no Supabase JWT at all, and have no login flow to get one from.
+# Identity comes from a per-user token in the URL itself instead. See
+# supabase/functions/calendar-feed/index.ts.
+[functions.calendar-feed]
+verify_jwt = false

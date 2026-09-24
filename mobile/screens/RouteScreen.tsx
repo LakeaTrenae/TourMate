@@ -35,13 +35,21 @@ type Stop = {
   longitude: number | null;
 };
 
+type RealSegment = { distanceMiles: number; durationMinutes: number };
+
+function segmentKey(fromId: string, toId: string) {
+  return `${fromId}_${toId}`;
+}
+
 export function RouteScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [stops, setStops] = useState<Stop[]>([]);
+  const [realSegments, setRealSegments] = useState<Record<string, RealSegment>>({});
   const [loading, setLoading] = useState(true);
+  const [computingRoutes, setComputingRoutes] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
 
@@ -57,18 +65,37 @@ export function RouteScreen({ route, navigation }: Props) {
       return;
     }
 
-    setStops(
-      ((data ?? []) as unknown as { id: string; date: string; venue: { name: string; city: string | null; latitude: number | null; longitude: number | null } | null }[]).map(
-        (row) => ({
-          id: row.id,
-          date: row.date,
-          venueName: row.venue?.name ?? null,
-          city: row.venue?.city ?? null,
-          latitude: row.venue?.latitude ?? null,
-          longitude: row.venue?.longitude ?? null,
-        })
-      )
+    const loadedStops = ((data ?? []) as unknown as { id: string; date: string; venue: { name: string; city: string | null; latitude: number | null; longitude: number | null } | null }[]).map(
+      (row) => ({
+        id: row.id,
+        date: row.date,
+        venueName: row.venue?.name ?? null,
+        city: row.venue?.city ?? null,
+        latitude: row.venue?.latitude ?? null,
+        longitude: row.venue?.longitude ?? null,
+      })
     );
+    setStops(loadedStops);
+
+    // Real driving segments already computed (route-directions writes
+    // these; this is a free, cached read — the edge function is only
+    // invoked on demand via "Calculate Driving Routes" below, since a
+    // Google Routes API call costs money per pair).
+    const dateIds = loadedStops.map((s) => s.id);
+    if (dateIds.length > 0) {
+      const { data: cached } = await supabase
+        .from('route_segments')
+        .select('from_tour_date_id, to_tour_date_id, distance_miles, duration_minutes')
+        .in('from_tour_date_id', dateIds);
+      const map: Record<string, RealSegment> = {};
+      for (const row of cached ?? []) {
+        map[segmentKey(row.from_tour_date_id, row.to_tour_date_id)] = {
+          distanceMiles: row.distance_miles,
+          durationMinutes: row.duration_minutes,
+        };
+      }
+      setRealSegments(map);
+    }
   }
 
   useFocusEffect(
@@ -78,6 +105,25 @@ export function RouteScreen({ route, navigation }: Props) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tourId])
   );
+
+  async function handleComputeRoutes() {
+    setErrorMessage(null);
+    setComputingRoutes(true);
+    const { data, error } = await supabase.functions.invoke('route-directions', { body: { tourId } });
+    setComputingRoutes(false);
+    if (error || data?.error) {
+      setErrorMessage(data?.error ?? error?.message ?? 'Failed to calculate driving routes.');
+      return;
+    }
+    const map: Record<string, RealSegment> = { ...realSegments };
+    for (const seg of data?.segments ?? []) {
+      map[segmentKey(seg.from_tour_date_id, seg.to_tour_date_id)] = {
+        distanceMiles: seg.distance_miles,
+        durationMinutes: seg.duration_minutes,
+      };
+    }
+    setRealSegments(map);
+  }
 
   if (loading) {
     return (
@@ -94,13 +140,28 @@ export function RouteScreen({ route, navigation }: Props) {
           <Text style={styles.title}>Route</Text>
           <Text style={styles.subtitle}>{tourName}</Text>
         </View>
-        {stops.length > 0 && (
-          <Pressable style={styles.toggleButton} onPress={() => setShowMap((v) => !v)}>
-            <Text style={styles.toggleButtonText}>{showMap ? 'List View' : 'Map View'}</Text>
-          </Pressable>
-        )}
+        <View style={styles.headerActions}>
+          {stops.length > 1 && (
+            <Pressable style={styles.toggleButton} onPress={handleComputeRoutes} disabled={computingRoutes}>
+              {computingRoutes ? (
+                <ActivityIndicator color={colors.accent} size="small" />
+              ) : (
+                <Text style={styles.toggleButtonText}>Calculate Driving Routes</Text>
+              )}
+            </Pressable>
+          )}
+          {stops.length > 0 && (
+            <Pressable style={styles.toggleButton} onPress={() => setShowMap((v) => !v)}>
+              <Text style={styles.toggleButtonText}>{showMap ? 'List View' : 'Map View'}</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
-      <Text style={styles.disclaimer}>Estimated straight-line distance between shows — not a driving route.</Text>
+      <Text style={styles.disclaimer}>
+        {Object.keys(realSegments).length > 0
+          ? 'Real driving distance/time where calculated — straight-line estimate otherwise.'
+          : 'Estimated straight-line distance between shows — tap "Calculate Driving Routes" for real driving times.'}
+      </Text>
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
@@ -132,9 +193,17 @@ export function RouteScreen({ route, navigation }: Props) {
           stops.map((stop, index) => {
             const prev = index > 0 ? stops[index - 1] : null;
             let distanceLabel: string | null = null;
-            if (prev && prev.latitude != null && prev.longitude != null && stop.latitude != null && stop.longitude != null) {
-              const miles = haversineDistanceMiles(prev.latitude, prev.longitude, stop.latitude, stop.longitude);
-              distanceLabel = `${Math.round(miles).toLocaleString()} mi from previous`;
+            if (prev) {
+              const real = realSegments[segmentKey(prev.id, stop.id)];
+              if (real) {
+                const hours = Math.floor(real.durationMinutes / 60);
+                const mins = real.durationMinutes % 60;
+                const durationLabel = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                distanceLabel = `${real.distanceMiles.toLocaleString()} mi driving · ${durationLabel}`;
+              } else if (prev.latitude != null && prev.longitude != null && stop.latitude != null && stop.longitude != null) {
+                const miles = haversineDistanceMiles(prev.latitude, prev.longitude, stop.latitude, stop.longitude);
+                distanceLabel = `${Math.round(miles).toLocaleString()} mi from previous (estimate)`;
+              }
             }
             return (
               <View key={stop.id}>
@@ -164,6 +233,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+    headerActions: { flexDirection: 'row', gap: 8 },
     title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
     toggleButton: { backgroundColor: colors.surface2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },

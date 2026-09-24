@@ -33,6 +33,10 @@ import { CreateOrganizationScreen } from './screens/CreateOrganizationScreen';
 import { CreateTourScreen } from './screens/CreateTourScreen';
 import { AddTourDateScreen } from './screens/AddTourDateScreen';
 import { ImportScheduleScreen } from './screens/ImportScheduleScreen';
+import { ImportTripitScreen } from './screens/ImportTripitScreen';
+import { ImportBudgetScreen } from './screens/ImportBudgetScreen';
+import { ImportGuestListScreen } from './screens/ImportGuestListScreen';
+import { ImportScreen } from './screens/ImportScreen';
 import { GuestListScreen } from './screens/GuestListScreen';
 import { AddGuestRequestScreen } from './screens/AddGuestRequestScreen';
 import { DocumentsScreen } from './screens/DocumentsScreen';
@@ -46,6 +50,10 @@ import { DirectoryScreen } from './screens/DirectoryScreen';
 import { ChecklistsScreen } from './screens/ChecklistsScreen';
 import { AddChecklistScreen } from './screens/AddChecklistScreen';
 import { ChecklistDetailScreen } from './screens/ChecklistDetailScreen';
+import { SetListsScreen } from './screens/SetListsScreen';
+import { AddSetListScreen } from './screens/AddSetListScreen';
+import { SetListDetailScreen } from './screens/SetListDetailScreen';
+import { SetListSharingScreen } from './screens/SetListSharingScreen';
 import { VenuesScreen } from './screens/VenuesScreen';
 import { AddVenueScreen } from './screens/AddVenueScreen';
 import { PassportVisaScreen } from './screens/PassportVisaScreen';
@@ -124,6 +132,10 @@ function RootNavigator() {
           <Stack.Screen name="CreateTour" component={CreateTourScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddTourDate" component={AddTourDateScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ImportSchedule" component={ImportScheduleScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ImportTripit" component={ImportTripitScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ImportBudget" component={ImportBudgetScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="ImportGuestList" component={ImportGuestListScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="Import" component={ImportScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="GuestList" component={GuestListScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddGuestRequest" component={AddGuestRequestScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Documents" component={DocumentsScreen} options={{ headerShown: true, title: '' }} />
@@ -138,6 +150,10 @@ function RootNavigator() {
           <Stack.Screen name="AddChecklist" component={AddChecklistScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ChecklistDetail" component={ChecklistDetailScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="ChecklistSharing" component={ChecklistSharingScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="SetLists" component={SetListsScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="AddSetList" component={AddSetListScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="SetListDetail" component={SetListDetailScreen} options={{ headerShown: true, title: '' }} />
+          <Stack.Screen name="SetListSharing" component={SetListSharingScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Venues" component={VenuesScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddVenue" component={AddVenueScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="PassportVisa" component={PassportVisaScreen} options={{ headerShown: true, title: '' }} />

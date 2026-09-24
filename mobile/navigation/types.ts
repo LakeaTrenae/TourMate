@@ -43,7 +43,7 @@ export type RootStackParamList = {
   Settlement: { tourId: string; tourDateId: string; tourDateLabel: string };
   Season: undefined;
   Route: { tourId: string; tourName: string };
-  Billing: { organizationId: string; organizationName: string };
+  Billing: undefined;
   PassportVisa: { targetUserId?: string; targetName?: string };
   EmergencyContact: { targetUserId?: string; targetName?: string };
   Artists: { tourId: string; tourName: string };
@@ -52,4 +52,12 @@ export type RootStackParamList = {
   ViewDocument: { bucket: string; storagePath: string; title: string };
   AuditLog: { tourId: string; tourName: string };
   TourExport: { tourId: string; tourName: string };
+  ImportTripit: { tourId: string };
+  ImportBudget: { tourId: string };
+  ImportGuestList: { tourId: string };
+  Import: { tourId: string; tourName: string };
+  SetLists: { tourId: string; tourName: string };
+  AddSetList: { tourId: string };
+  SetListDetail: { setlistId: string; tourId: string; name: string };
+  SetListSharing: { setlistId: string; tourId: string; setlistName: string };
 };

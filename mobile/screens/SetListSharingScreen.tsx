@@ -1,0 +1,187 @@
+/**
+ * SetListSharingScreen — view and edit exactly who this set list is
+ * shared with, beyond the base visible_to_all / owning-department
+ * visibility (0040, resource_shares 'setlist' branch). Structurally
+ * identical to AdvanceSharingScreen/ChecklistSharingScreen — same
+ * immediate-persist checkbox pattern, just resource_type 'setlist'.
+ *
+ * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
+ * review — see lib/theme.tsx.
+ */
+import { useCallback, useMemo, useState } from 'react';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth-context';
+import { fetchTourRoster, type RosterMember } from '../lib/roster';
+import { formatDepartment } from '../lib/format';
+import { logAuditEvent } from '../lib/auditLog';
+import { notify } from '../lib/notify';
+import { useTheme, fonts, type ThemeColors } from '../lib/theme';
+import type { RootStackParamList } from '../navigation/types';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'SetListSharing'>;
+
+const DEPARTMENTS = ['artist_relations', 'production', 'general', 'security', 'travel', 'finance', 'tour_management'];
+
+type Share = { id: string; shared_with_user_id: string | null; shared_with_department: string | null };
+
+export function SetListSharingScreen({ route }: Props) {
+  const { setlistId, tourId, setlistName } = route.params;
+  const { session } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const [visibleToAll, setVisibleToAll] = useState<boolean | null>(null);
+  const [shares, setShares] = useState<Share[]>([]);
+  const [roster, setRoster] = useState<RosterMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function load() {
+    const [setlistRes, sharesRes, rosterList] = await Promise.all([
+      supabase.from('setlists').select('visible_to_all').eq('id', setlistId).single(),
+      supabase.from('resource_shares').select('id, shared_with_user_id, shared_with_department').eq('resource_type', 'setlist').eq('resource_id', setlistId),
+      fetchTourRoster(tourId).catch(() => [] as RosterMember[]),
+    ]);
+    if (setlistRes.error) setErrorMessage(setlistRes.error.message);
+    setVisibleToAll(setlistRes.data?.visible_to_all ?? null);
+    if (sharesRes.error) setErrorMessage(sharesRes.error.message);
+    setShares(sharesRes.data ?? []);
+    setRoster(rosterList);
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load().finally(() => setLoading(false));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [setlistId])
+  );
+
+  async function toggleUserShare(userId: string) {
+    if (!session) return;
+    setErrorMessage(null);
+    const existing = shares.find((s) => s.shared_with_user_id === userId);
+    if (existing) {
+      const { error } = await supabase.from('resource_shares').delete().eq('id', existing.id);
+      if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'unshare', resourceType: 'resource_share', resourceId: setlistId, detail: { resource_type: 'setlist', shared_with_user_id: userId } });
+    } else {
+      const { error } = await supabase.from('resource_shares').insert({
+        tour_id: tourId,
+        resource_type: 'setlist',
+        resource_id: setlistId,
+        shared_with_user_id: userId,
+        permission: 'view',
+        granted_by: session.user.id,
+      });
+      if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'share', resourceType: 'resource_share', resourceId: setlistId, detail: { resource_type: 'setlist', shared_with_user_id: userId } });
+      notify({ tourId, targetUserIds: [userId], title: 'Set list shared with you', body: setlistName, data: { type: 'setlist_share', setlistId } });
+    }
+    await load();
+  }
+
+  async function toggleDepartmentShare(department: string) {
+    if (!session) return;
+    setErrorMessage(null);
+    const existing = shares.find((s) => s.shared_with_department === department);
+    if (existing) {
+      const { error } = await supabase.from('resource_shares').delete().eq('id', existing.id);
+      if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'unshare', resourceType: 'resource_share', resourceId: setlistId, detail: { resource_type: 'setlist', shared_with_department: department } });
+    } else {
+      const { error } = await supabase.from('resource_shares').insert({
+        tour_id: tourId,
+        resource_type: 'setlist',
+        resource_id: setlistId,
+        shared_with_department: department,
+        permission: 'view',
+        granted_by: session.user.id,
+      });
+      if (error) { setErrorMessage(error.message); return; }
+      logAuditEvent({ tourId, actorId: session.user.id, action: 'share', resourceType: 'resource_share', resourceId: setlistId, detail: { resource_type: 'setlist', shared_with_department: department } });
+      const targets = roster.filter((r) => r.department === department).map((r) => r.user_id);
+      notify({ tourId, targetUserIds: targets, title: 'Set list shared with you', body: setlistName, data: { type: 'setlist_share', setlistId } });
+    }
+    await load();
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Sharing</Text>
+      <Text style={styles.subtitle}>{setlistName}</Text>
+
+      {visibleToAll && (
+        <Text style={styles.orgNote}>
+          This is already visible to everyone on the tour — specific shares below only matter if it's switched to department-only.
+        </Text>
+      )}
+
+      {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+
+      <Text style={styles.sectionLabel}>Departments</Text>
+      {DEPARTMENTS.map((d) => {
+        const checked = shares.some((s) => s.shared_with_department === d);
+        return (
+          <Pressable key={d} style={styles.checkboxRow} onPress={() => toggleDepartmentShare(d)}>
+            <View style={[styles.checkbox, checked && styles.checkboxChecked]}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
+            <Text style={styles.checkboxLabel}>{formatDepartment(d)}</Text>
+          </Pressable>
+        );
+      })}
+
+      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>People</Text>
+      {roster.length === 0 && <Text style={styles.emptyText}>No one on the roster yet.</Text>}
+      {roster.map((member) => {
+        const checked = shares.some((s) => s.shared_with_user_id === member.user_id);
+        return (
+          <Pressable key={member.user_id} style={styles.checkboxRow} onPress={() => toggleUserShare(member.user_id)}>
+            <View style={[styles.checkbox, checked && styles.checkboxChecked]}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
+            <Text style={styles.checkboxLabel}>{member.display_name}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 20, paddingBottom: 60 },
+    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    orgNote: { color: colors.warn, fontSize: 12, marginBottom: 16, fontStyle: 'italic', fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    sectionLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    sectionLabelSpaced: { marginTop: 20 },
+    emptyText: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.textFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
+    checkmark: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodyBold },
+    checkboxLabel: { color: colors.text, fontSize: 15, fontFamily: fonts.body },
+  });
+}

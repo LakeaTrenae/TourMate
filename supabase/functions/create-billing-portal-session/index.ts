@@ -1,10 +1,12 @@
 // create-billing-portal-session — Supabase Edge Function (Deno)
 //
-// Creates a Stripe Billing Portal session so an org owner/admin can
-// update their payment method, view invoices, switch monthly/annual, or
-// cancel — all inside Stripe's own hosted UI, opened via Linking.openURL
-// the same way create-checkout-session's URL is. Same auth pattern as
-// every other function here (see create-checkout-session's header).
+// Creates a Stripe Billing Portal session so a signed-in user can update
+// their payment method, view invoices, switch monthly/annual, or cancel
+// their OWN individual Professional license — all inside Stripe's own
+// hosted UI, opened via Linking.openURL the same way create-checkout-
+// session's URL is. Same auth pattern as every other function here (see
+// create-checkout-session's header) — no admin/org gate, since this only
+// ever acts on the caller's own billing record.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@^22.4.0";
 
@@ -56,28 +58,18 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser();
     if (userError || !user) return jsonResponse({ error: "Not authenticated" }, 401);
 
-    const { orgId } = await req.json();
-    if (!orgId) return jsonResponse({ error: "orgId is required" }, 400);
-
-    const { data: isAdmin, error: adminError } = await supabase.rpc("is_org_admin", {
-      p_org_id: orgId,
-      p_user_id: user.id,
-    });
-    if (adminError) return jsonResponse({ error: adminError.message }, 500);
-    if (!isAdmin) return jsonResponse({ error: "Only an organization owner or admin can manage billing." }, 403);
-
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .select("billing_customer_id")
-      .eq("id", orgId)
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("stripe_customer_id")
+      .eq("id", user.id)
       .single();
-    if (orgError || !org) return jsonResponse({ error: orgError?.message ?? "Organization not found" }, 404);
-    if (!org.billing_customer_id) {
-      return jsonResponse({ error: "This organization has no billing account yet — subscribe first." }, 400);
+    if (profileError || !profile) return jsonResponse({ error: profileError?.message ?? "Profile not found" }, 404);
+    if (!profile.stripe_customer_id) {
+      return jsonResponse({ error: "You don't have a billing account yet — subscribe first." }, 400);
     }
 
     const session = await getStripe().billingPortal.sessions.create({
-      customer: org.billing_customer_id,
+      customer: profile.stripe_customer_id,
       return_url: "tourmate://billing",
     });
 

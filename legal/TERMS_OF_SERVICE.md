@@ -19,14 +19,14 @@ You're responsible for keeping your account credentials secure and for all activ
 
 ## 4. Subscriptions and billing
 
-- **Pricing**: TourMate is billed per seat (each distinct person active across an organization's tours) — $39.99 per seat per month, or $34.99 per seat per month billed annually ($419.88/year).
-- **Free trial**: new organizations get a 7-day free trial with no credit card required. No charge occurs unless and until you actively subscribe.
+- **Who pays**: crew and other view-only participants use TourMate free, with no time limit. If you need to create, edit, or manage a tour — as an owner, admin, or manager — you need your own individual subscription. That subscription is tied to you personally, not to any one organization: once subscribed, you get full access on every tour and organization you're part of.
+- **Pricing**: $74.99 per month, or $64.99 per month billed annually ($779.88/year).
+- **Free trial**: new accounts get a 7-day free trial with no credit card required. No charge occurs unless and until you actively subscribe.
 - **Billing**: subscriptions are billed and processed through Stripe. By subscribing, you authorize us (via Stripe) to charge your payment method on a recurring basis for as long as your subscription remains active.
-- **Seat count**: your subscription's seat count is based on the number of distinct people active on your organization's tours, and may be adjusted (by you, via the "Sync Seats" option in Billing) as your roster changes.
 - **Cancellation**: you may cancel at any time via the in-app billing management portal. Cancellation takes effect at the end of your current billing period — you keep access until then, and are not charged again afterward.
 - **Refunds**: [TODO: this draft assumes no refunds for partial billing periods, as a standard SaaS default — confirm this is actually your policy, or specify a different one, before publishing.]
-- **Lapsed payment**: if a payment fails and isn't resolved, or your trial ends without subscribing, your organization's access to tour data is suspended until payment is restored. Your data is not deleted — it becomes accessible again as soon as billing is resolved.
-- **Price changes**: we'll give you reasonable advance notice before any price change takes effect for your organization.
+- **Lapsed payment**: if your payment fails and isn't resolved, or your trial ends without subscribing, your own access drops to free/view-only — you can still see and follow every tour you're part of, but you lose the ability to create or edit anything, until you resubscribe. This affects only you, not anyone else on your tours or in your organization: nobody else's access changes, and no data is deleted.
+- **Price changes**: we'll give you reasonable advance notice before any price change takes effect for your subscription.
 
 ## 5. Acceptable use
 
@@ -43,7 +43,7 @@ We may suspend or terminate accounts that violate these terms.
 
 You (or your organization) retain ownership of the content you upload — schedules, documents, budget data, and so on. By uploading content, you grant us the limited right to store, process, and display it back to you and whoever else you've given access to, solely to provide the App's functionality. We don't claim ownership of your tour's data, and we don't use it for anything beyond running the App for you.
 
-If your organization's subscription lapses or your account is deleted, your organization's content is not deleted — it remains available to the rest of your team once billing is restored (see §4), consistent with how the App's account-deletion behavior works (Privacy Policy §6).
+If your subscription lapses or your account is deleted, your organization's content is not deleted — it remains available to the rest of your team, and your own view-only access continues uninterrupted, with full access restored as soon as billing is resolved (see §4), consistent with how the App's account-deletion behavior works (Privacy Policy §6).
 
 ## 7. Disclaimers and limitation of liability
 
@@ -53,7 +53,7 @@ Nothing in this section limits liability where the law doesn't allow it to be li
 
 ## 8. Termination
 
-You may stop using the App and delete your account at any time. We may suspend or terminate your access if you violate these terms, or an organization's access if its subscription lapses (subject to §4). Sections that by their nature should survive termination (ownership, disclaimers, governing law) continue to apply.
+You may stop using the App and delete your account at any time. We may suspend or terminate your access if you violate these terms, or downgrade your own access to free/view-only if your individual subscription lapses (subject to §4). Sections that by their nature should survive termination (ownership, disclaimers, governing law) continue to apply.
 
 ## 9. Governing law
 

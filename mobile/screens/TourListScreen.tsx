@@ -35,6 +35,7 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth-context';
 import { formatDateOnly, parseDateOnly } from '../lib/dates';
 import { useCachedLoad } from '../lib/useCachedLoad';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
@@ -50,8 +51,6 @@ type TourRow = {
   completed_at: string | null;
   organization: { id: string; name: string } | null;
 };
-
-type LockedOrg = { id: string; name: string };
 
 type DateStatus = 'in_progress' | 'upcoming' | 'past';
 type FilterMode = 'all' | DateStatus;
@@ -86,6 +85,7 @@ function chunkPairs<T>(items: T[]): T[][] {
 }
 
 export function TourListScreen({ navigation }: Props) {
+  const { session } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -93,7 +93,7 @@ export function TourListScreen({ navigation }: Props) {
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lockedOrgs, setLockedOrgs] = useState<LockedOrg[]>([]);
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
 
   // `organization:organizations(name)` embeds the related org row via the
   // organization_id foreign key — one round trip instead of N+1 queries
@@ -115,40 +115,52 @@ export function TourListScreen({ navigation }: Props) {
   // useFocusEffect (not a plain useEffect) so the list re-fetches every
   // time this screen comes back into focus — e.g. after backing out of a
   // tour dashboard where something may have changed.
-  // Deliberately NOT a plain `organizations`/`organization_members`
-  // select — organization_members only ever contains the org creator
-  // (confirmed directly against live data: a crew member invited via
-  // tour_invites/tour_members never gets a row there), and tour_members
-  // itself IS gated by the billing lock (0034's effective_tour_role
-  // patch). A crew-only member would have no readable table left to
-  // learn their org is locked from — exactly the "tours silently
-  // vanish, no explanation" problem this banner exists to prevent. The
-  // my_organizations_billing_status RPC (0035) is deliberately NOT
-  // billing-gated for this exact reason: its whole purpose is to keep
-  // working once org_billing_active is false.
-  const fetchLockedOrgs = useCallback(async () => {
-    const { data, error } = await supabase.rpc('my_organizations_billing_status');
-    if (error) return; // best-effort — the tours query above still works either way
-    const now = Date.now();
-    const locked = ((data ?? []) as {
-      organization_id: string;
-      organization_name: string;
-      subscription_status: string;
-      trial_ends_at: string | null;
-    }[]).filter((org) => {
-      if (org.subscription_status === 'active') return false;
-      if (org.subscription_status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at).getTime() > now) {
-        return false;
-      }
-      return true; // past_due, canceled, none, or an expired trial
-    });
-    setLockedOrgs(locked.map((org) => ({ id: org.organization_id, name: org.organization_name })));
-  }, []);
+  //
+  // Per-user billing (0037_per_user_billing.sql): there's no "locked org"
+  // anymore — a lapsed subscription only demotes the ONE under-billed
+  // person to crew, everyone else on the org/tour is untouched. So this
+  // banner is now about the signed-in user's own billing, not anyone
+  // else's: show it only if (a) they hold an owner/admin/manager row
+  // somewhere — otherwise upgrading wouldn't unlock anything for them —
+  // and (b) their own subscription isn't currently active. Both checks
+  // are on tables/RPCs that stay readable regardless of billing status
+  // (my_billing_status() always returns the caller's own row; a crew-only
+  // member simply won't have any owner/admin/manager row to find, so the
+  // banner naturally never shows for them).
+  const fetchBillingBanner = useCallback(async () => {
+    if (!session) return;
+    const [billingRes, orgRoleRes, tourRoleRes] = await Promise.all([
+      supabase.rpc('my_billing_status').maybeSingle(),
+      supabase
+        .from('organization_members')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .in('role', ['owner', 'admin', 'manager'])
+        .limit(1),
+      supabase
+        .from('tour_members')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .in('role', ['owner', 'admin', 'manager'])
+        .limit(1),
+    ]);
+    if (billingRes.error) return; // best-effort — the tours query above still works either way
+    const billing = billingRes.data as { subscription_status: string; trial_ends_at: string | null } | null;
+    const hasManagerRole = (orgRoleRes.data?.length ?? 0) > 0 || (tourRoleRes.data?.length ?? 0) > 0;
+    const isActive =
+      !!billing &&
+      (billing.subscription_status === 'active' ||
+        (billing.subscription_status === 'trialing' &&
+          !!billing.trial_ends_at &&
+          new Date(billing.trial_ends_at).getTime() > Date.now()));
+    setShowUpgradeBanner(hasManagerRole && !isActive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   useFocusEffect(
     useCallback(() => {
       refresh().catch((err) => setErrorMessage(err instanceof Error ? err.message : 'Failed to load tours.'));
-      fetchLockedOrgs();
+      fetchBillingBanner();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -303,16 +315,12 @@ export function TourListScreen({ navigation }: Props) {
       {isOffline && <Text style={styles.offlineBanner}>You're offline — showing last synced data.</Text>}
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
-      {lockedOrgs.map((org) => (
-        <Pressable
-          key={org.id}
-          style={styles.lockedOrgBanner}
-          onPress={() => navigation.navigate('Billing', { organizationId: org.id, organizationName: org.name })}
-        >
-          <Text style={styles.lockedOrgText}>🔒 Billing needed for {org.name}</Text>
+      {showUpgradeBanner && (
+        <Pressable style={styles.lockedOrgBanner} onPress={() => navigation.navigate('Billing')}>
+          <Text style={styles.lockedOrgText}>You're on free crew access — subscribe to manage your tours</Text>
           <Text style={styles.lockedOrgArrow}>›</Text>
         </Pressable>
-      ))}
+      )}
 
       <SectionList
         sections={sections}

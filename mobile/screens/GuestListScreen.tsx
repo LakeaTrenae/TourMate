@@ -234,13 +234,18 @@ export function GuestListScreen({ route, navigation }: Props) {
           <Text style={styles.title}>Guest List</Text>
           <Text style={styles.subtitle}>{tourName}</Text>
         </View>
-        <Pressable
-          style={styles.addButton}
-          onPress={() => navigation.navigate('AddGuestRequest', { tourId })}
-          disabled={dates.length === 0}
-        >
-          <Text style={styles.addButtonText}>+ Request</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('ImportGuestList', { tourId })} disabled={dates.length === 0}>
+            <Text style={styles.secondaryButtonText}>Import</Text>
+          </Pressable>
+          <Pressable
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddGuestRequest', { tourId })}
+            disabled={dates.length === 0}
+          >
+            <Text style={styles.addButtonText}>+ Request</Text>
+          </Pressable>
+        </View>
       </View>
 
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
@@ -287,7 +292,10 @@ function createStyles(colors: ThemeColors) {
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    headerActions: { flexDirection: 'row', gap: 8 },
     addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    secondaryButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    secondaryButtonText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
     addButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },

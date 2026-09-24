@@ -378,7 +378,9 @@ export function TourDashboardScreen({ route, navigation }: Props) {
         <NavRow styles={styles} label="Guest List" onPress={() => navigation.navigate('GuestList', { tourId, tourName })} />
         <NavRow styles={styles} label="Documents" onPress={() => navigation.navigate('Documents', { tourId, tourName })} />
         <NavRow styles={styles} label="Checklists" onPress={() => navigation.navigate('Checklists', { tourId, tourName })} />
+        <NavRow styles={styles} label="Set Lists" onPress={() => navigation.navigate('SetLists', { tourId, tourName })} />
         <NavRow styles={styles} label="Full Tour Export" onPress={() => navigation.navigate('TourExport', { tourId, tourName })} />
+        <NavRow styles={styles} label="Import Data" onPress={() => navigation.navigate('Import', { tourId, tourName })} />
         {isManager && <NavRow styles={styles} label="Budget" onPress={() => navigation.navigate('Budget', { tourId, tourName })} />}
         {isManager && <NavRow styles={styles} label="Activity Log" onPress={() => navigation.navigate('AuditLog', { tourId, tourName })} />}
       </Section>

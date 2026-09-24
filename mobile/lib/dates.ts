@@ -24,3 +24,17 @@ export function parseDateOnly(dateStr: string): Date {
 export function formatDateOnly(dateStr: string, options: Intl.DateTimeFormatOptions): string {
   return parseDateOnly(dateStr).toLocaleDateString(undefined, options);
 }
+
+/**
+ * Monday of the week `dateStr` falls in, as a YYYY-MM-DD string — for
+ * grouping anything date-stamped into weekly buckets (BudgetScreen's
+ * per-week breakdown). Monday, not Sunday, since that's the touring
+ * industry's usual week boundary for a routing sheet.
+ */
+export function getWeekStart(dateStr: string): string {
+  const d = parseDateOnly(dateStr);
+  const day = d.getDay(); // 0 = Sunday .. 6 = Saturday
+  const diff = (day === 0 ? -6 : 1) - day; // days back to the preceding (or same) Monday
+  d.setDate(d.getDate() + diff);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

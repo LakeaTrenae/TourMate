@@ -61,20 +61,6 @@ export function ManageTeamScreen({ route, navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Fire-and-forget — looks up this tour's org, then asks sync-org-seats
-  // to push a fresh seat count to Stripe if the org has an active
-  // subscription. Silently no-ops if the org isn't subscribed yet
-  // (sync-org-seats itself returns a clean 400 in that case).
-  async function resyncOrgSeats() {
-    try {
-      const { data: tour } = await supabase.from('tours').select('organization_id').eq('id', tourId).single();
-      if (!tour?.organization_id) return;
-      await supabase.functions.invoke('sync-org-seats', { body: { orgId: tour.organization_id } });
-    } catch {
-      // best-effort — never surfaced to the user
-    }
-  }
-
   async function load() {
     const [{ data: memberRows, error: memberError }, { data: inviteRows, error: inviteError }] = await Promise.all([
       supabase.from('tour_members').select('user_id, role, department, profile:profiles(display_name, email)').eq('tour_id', tourId),
@@ -129,14 +115,6 @@ export function ManageTeamScreen({ route, navigation }: Props) {
                 resourceId: member.user_id,
                 detail: { display_name: member.profile?.display_name, role: member.role, self: isSelf },
               });
-              // Best-effort seat resync (fire-and-forget, mirrors
-              // logAuditEvent/notify's pattern) — a removal is one of the
-              // few roster changes that's both synchronous and
-              // client-visible enough to resync from; see
-              // compute_org_seat_count's own comment for why this isn't
-              // the primary reconciliation mechanism (it's recomputed
-              // live on every BillingScreen visit regardless).
-              resyncOrgSeats();
             }
             if (isSelf) {
               navigation.navigate('TourList');

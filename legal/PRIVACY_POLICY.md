@@ -23,7 +23,7 @@ TourMate is built around organizations and tours, and most of what it stores is 
 - **Financial information**: budget entries, receipts, and settlement figures for the tours you have access to (visible only to tour managers, not general crew).
 - **Documents and files** you or others upload — riders, contracts, itineraries, receipts, venue photos.
 - **Messages and notifications**: push notification tokens (so we can send you tour-related alerts), and an internal activity log of certain sensitive actions (visible only to tour managers) for accountability.
-- **Billing information**, for organizations that subscribe: your organization's subscription status, seat count, and billing history. **We do not collect or store your payment card details ourselves** — that's handled entirely by our payment processor, Stripe (see §4).
+- **Billing information**, if you subscribe: your own subscription status and billing history. **We do not collect or store your payment card details ourselves** — that's handled entirely by our payment processor, Stripe (see §4).
 
 We do not ask for, and have no interest in collecting, information unrelated to running a tour or production.
 

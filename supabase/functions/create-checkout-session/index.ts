@@ -1,19 +1,24 @@
 // create-checkout-session — Supabase Edge Function (Deno)
 //
-// Creates a Stripe-hosted subscription Checkout Session for an org owner/
-// admin to subscribe (or re-subscribe) — mode 'subscription', seat-based
-// quantity, monthly or annual Price. The client opens the returned URL via
-// Linking.openURL (system browser), never an in-app WebView — this is
-// what keeps the app clear of Apple/Google's in-app-purchase rules for a
-// B2B tool (see BillingScreen.tsx for the client side of this).
+// Creates a Stripe-hosted subscription Checkout Session for the CALLING
+// USER to subscribe (or re-subscribe) to their own individual Professional
+// license — mode 'subscription', quantity always 1, monthly or annual
+// Price. Per-user, not per-org: this license follows the person across
+// every org/tour they belong to, matching Master Tour's real pricing model
+// (crew/view-only access is free and unlimited forever; only owner/admin/
+// manager-tier access requires an individual subscription). The client
+// opens the returned URL via Linking.openURL (system browser), never an
+// in-app WebView — this is what keeps the app clear of Apple/Google's
+// in-app-purchase rules for a B2B tool (see BillingScreen.tsx for the
+// client side of this).
 //
 // Same auth pattern as every other function here: anon-scoped client +
-// Authorization passthrough + auth.getUser() to identify the caller, then
-// an RPC gate (is_org_admin — the same function organizations'/
-// organization_members' own RLS policies use) before spending anything.
-// No service_role needed — every write here (persisting a new
-// billing_customer_id) happens under the caller's own JWT, since they've
-// already been confirmed to be an owner/admin of this org.
+// Authorization passthrough + auth.getUser() to identify the caller. No
+// admin/org gate at all — anyone can subscribe to their own access, there's
+// nothing to authorize beyond "is this a real signed-in user." No
+// service_role needed — every write here (persisting a new
+// stripe_customer_id) happens under the caller's own JWT against their own
+// profiles row.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@^22.4.0";
 
@@ -65,61 +70,50 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser();
     if (userError || !user) return jsonResponse({ error: "Not authenticated" }, 401);
 
-    const { orgId, interval } = await req.json();
-    if (!orgId || (interval !== "monthly" && interval !== "annual")) {
-      return jsonResponse({ error: "orgId and interval ('monthly' | 'annual') are required" }, 400);
+    const { interval } = await req.json();
+    if (interval !== "monthly" && interval !== "annual") {
+      return jsonResponse({ error: "interval ('monthly' | 'annual') is required" }, 400);
     }
 
-    const { data: isAdmin, error: adminError } = await supabase.rpc("is_org_admin", {
-      p_org_id: orgId,
-      p_user_id: user.id,
-    });
-    if (adminError) return jsonResponse({ error: adminError.message }, 500);
-    if (!isAdmin) return jsonResponse({ error: "Only an organization owner or admin can manage billing." }, 403);
-
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .select("name, billing_customer_id")
-      .eq("id", orgId)
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name, stripe_customer_id")
+      .eq("id", user.id)
       .single();
-    if (orgError || !org) return jsonResponse({ error: orgError?.message ?? "Organization not found" }, 404);
+    if (profileError || !profile) return jsonResponse({ error: profileError?.message ?? "Profile not found" }, 404);
 
-    // Reuse the existing Stripe Customer if this org has one (e.g.
+    // Reuse the existing Stripe Customer if this person has one (e.g.
     // re-subscribing after a lapse); create one otherwise. Persisted back
-    // under the caller's own JWT — allowed since they already passed the
-    // is_org_admin check above, matching organizations' own update policy.
-    let customerId = org.billing_customer_id;
+    // under the caller's own JWT against their own profiles row.
+    let customerId = profile.stripe_customer_id;
     if (!customerId) {
       const customer = await getStripe().customers.create({
-        name: org.name,
+        name: profile.full_name,
         email: user.email,
-        metadata: { organization_id: orgId },
+        metadata: { user_id: user.id },
       });
       customerId = customer.id;
       const { error: updateError } = await supabase
-        .from("organizations")
-        .update({ billing_customer_id: customerId })
-        .eq("id", orgId);
+        .from("profiles")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", user.id);
       if (updateError) return jsonResponse({ error: updateError.message }, 500);
     }
-
-    const { data: seatCount, error: seatError } = await supabase.rpc("compute_org_seat_count", { p_org_id: orgId });
-    if (seatError) return jsonResponse({ error: seatError.message }, 500);
 
     const priceId =
       interval === "annual" ? Deno.env.get("STRIPE_PRICE_ANNUAL") : Deno.env.get("STRIPE_PRICE_MONTHLY");
     if (!priceId) return jsonResponse({ error: `Missing STRIPE_PRICE_${interval.toUpperCase()} secret` }, 500);
 
     // No trial_period_days here on purpose — the 7-day trial is tracked
-    // entirely in organizations.trial_ends_at (org_billing_active reads
-    // it directly). A second, Stripe-side trial clock on top would just
+    // entirely in profiles.trial_ends_at (user_billing_active reads it
+    // directly). A second, Stripe-side trial clock on top would just
     // disagree with the DB one.
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      line_items: [{ price: priceId, quantity: Math.max(seatCount ?? 1, 1) }],
-      client_reference_id: orgId,
-      subscription_data: { metadata: { organization_id: orgId } },
+      line_items: [{ price: priceId, quantity: 1 }],
+      client_reference_id: user.id,
+      subscription_data: { metadata: { user_id: user.id } },
       // Tells Stripe this Checkout Session was opened from a mobile app
       // (via the system browser) rather than a regular web page —
       // Stripe's own parameter for exactly this integration shape.

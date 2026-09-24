@@ -77,6 +77,18 @@ const WebStorageAdapter = {
   },
 };
 
+/**
+ * Direct HTTPS URL to an edge function — for the rare case something
+ * outside supabase-js needs to hit one directly (a calendar app polling
+ * calendar-feed with no Supabase JWT at all; a plain GET no client
+ * library is involved in). Every other edge-function call in this app
+ * goes through `supabase.functions.invoke`, which handles the anon key
+ * and JWT itself — reach for this only when that's not possible.
+ */
+export function functionsUrl(name: string): string {
+  return `${supabaseUrl}/functions/v1/${name}`;
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: Platform.OS === 'web' ? WebStorageAdapter : SecureStoreAdapter,

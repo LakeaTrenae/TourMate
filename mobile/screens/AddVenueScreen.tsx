@@ -33,6 +33,15 @@ import type { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'AddVenue'>;
 
 type Photo = { id: string; storage_path: string; url: string };
+type VenueContact = { name: string; role: string; phone: string; email: string };
+
+const TECH_SPEC_FIELDS: { key: string; label: string }[] = [
+  { key: 'stage_size', label: 'Stage Size' },
+  { key: 'power', label: 'Power' },
+  { key: 'rigging', label: 'Rigging' },
+  { key: 'loading_dock', label: 'Loading Dock' },
+  { key: 'wifi', label: 'WiFi' },
+];
 
 export function AddVenueScreen({ route, navigation }: Props) {
   const { organizationId, venueId } = route.params;
@@ -54,12 +63,19 @@ export function AddVenueScreen({ route, navigation }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [techSpecs, setTechSpecs] = useState<Record<string, string>>({});
+  const [contacts, setContacts] = useState<VenueContact[]>([]);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactRole, setContactRole] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
     if (!venueId) return;
     supabase
       .from('venues')
-      .select('name, address, city, state, country, capacity, latitude, longitude')
+      .select('name, address, city, state, country, capacity, latitude, longitude, tech_specs, contacts')
       .eq('id', venueId)
       .single()
       .then(({ data, error }) => {
@@ -75,10 +91,26 @@ export function AddVenueScreen({ route, navigation }: Props) {
           if (data.latitude != null && data.longitude != null) {
             setCoords({ latitude: data.latitude, longitude: data.longitude });
           }
+          setTechSpecs((data.tech_specs as Record<string, string>) ?? {});
+          setContacts((data.contacts as VenueContact[]) ?? []);
         }
         setLoading(false);
       });
   }, [venueId]);
+
+  function addContact() {
+    if (!contactName.trim()) return;
+    setContacts((prev) => [...prev, { name: contactName.trim(), role: contactRole.trim(), phone: contactPhone.trim(), email: contactEmail.trim() }]);
+    setContactName('');
+    setContactRole('');
+    setContactPhone('');
+    setContactEmail('');
+    setShowAddContact(false);
+  }
+
+  function removeContact(index: number) {
+    setContacts((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function loadPhotos() {
     if (!venueId) return;
@@ -226,6 +258,8 @@ export function AddVenueScreen({ route, navigation }: Props) {
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
       geocoded_at: coords ? new Date().toISOString() : null,
+      tech_specs: techSpecs,
+      contacts,
     };
 
     const { error } = isEditing
@@ -278,6 +312,53 @@ export function AddVenueScreen({ route, navigation }: Props) {
           Located: {coords.latitude.toFixed(3)}, {coords.longitude.toFixed(3)} (city-level, not the exact address)
         </Text>
       )}
+
+      <Text style={styles.sectionTitle}>Tech Specs</Text>
+      <Text style={styles.photosHint}>Reusable facts about this building — separate from any one show's specific advance request.</Text>
+      {TECH_SPEC_FIELDS.map((f) => (
+        <View key={f.key} style={styles.specRow}>
+          <Text style={styles.specLabel}>{f.label}</Text>
+          <TextInput
+            style={styles.specInput}
+            placeholder="—"
+            placeholderTextColor={colors.textFaint}
+            value={techSpecs[f.key] ?? ''}
+            onChangeText={(v) => setTechSpecs((prev) => ({ ...prev, [f.key]: v }))}
+          />
+        </View>
+      ))}
+
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Venue Contacts</Text>
+        <Pressable onPress={() => setShowAddContact((v) => !v)}>
+          <Text style={styles.sectionAction}>{showAddContact ? 'Cancel' : '+ Add'}</Text>
+        </Pressable>
+      </View>
+      {showAddContact && (
+        <View style={styles.addForm}>
+          <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.textFaint} value={contactName} onChangeText={setContactName} />
+          <TextInput style={styles.input} placeholder="Role (Box Office, Settlement...)" placeholderTextColor={colors.textFaint} value={contactRole} onChangeText={setContactRole} />
+          <View style={styles.row}>
+            <TextInput style={[styles.input, styles.rowInput]} placeholder="Phone" placeholderTextColor={colors.textFaint} value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" />
+            <TextInput style={[styles.input, styles.rowInput]} placeholder="Email" placeholderTextColor={colors.textFaint} value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" />
+          </View>
+          <Pressable style={styles.miniSaveButton} onPress={addContact} disabled={!contactName.trim()}>
+            <Text style={styles.miniSaveButtonText}>Add Contact</Text>
+          </Pressable>
+        </View>
+      )}
+      {contacts.length === 0 && !showAddContact && <Text style={styles.photosHint}>No contacts on file.</Text>}
+      {contacts.map((c, index) => (
+        <Pressable key={index} style={styles.contactRow} onLongPress={() => removeContact(index)}>
+          <View>
+            <Text style={styles.contactName}>{c.name}</Text>
+            {(c.role || c.phone || c.email) && <Text style={styles.contactMeta}>{[c.role, c.phone, c.email].filter(Boolean).join(' · ')}</Text>}
+          </View>
+          <Pressable onPress={() => removeContact(index)}>
+            <Text style={styles.sectionAction}>Remove</Text>
+          </Pressable>
+        </Pressable>
+      ))}
 
       {isEditing && (
         <>
@@ -341,6 +422,40 @@ function createStyles(colors: ThemeColors) {
     geocodeButtonText: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodySemiBold },
     coordsText: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: fonts.mono },
     sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 4 },
+    sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 },
+    sectionAction: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    specRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, gap: 12 },
+    specLabel: { color: colors.text, fontSize: 13, fontFamily: fonts.body, flex: 1 },
+    specInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      fontSize: 13,
+      fontFamily: fonts.mono,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flex: 1,
+      textAlign: 'right',
+    },
+    addForm: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginTop: 8, marginBottom: 8, gap: 8, borderWidth: 1, borderColor: colors.border },
+    miniSaveButton: { backgroundColor: colors.accent, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+    miniSaveButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    contactRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    contactName: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    contactMeta: { color: colors.textDim, fontSize: 12, marginTop: 2, fontFamily: fonts.body },
     photosHint: { color: colors.textFaint, fontSize: 12, marginBottom: 8, fontFamily: fonts.body },
     photoRow: { flexGrow: 0 },
     photoRowContent: { gap: 10, paddingRight: 8 },

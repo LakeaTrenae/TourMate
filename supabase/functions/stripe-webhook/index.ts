@@ -11,23 +11,28 @@
 // the service_role client for its ENTIRE body, not just an escalation:
 // there is no caller session to scope anything to.
 //
-// Handles: checkout.session.completed (first-time subscribe — org id
+// Handles: checkout.session.completed (first-time subscribe — user id
 // comes from client_reference_id), customer.subscription.updated /
-// .deleted (ongoing status changes — org id from subscription_data's
-// metadata.organization_id, set at checkout time, falling back to a
+// .deleted (ongoing status changes — user id from subscription_data's
+// metadata.user_id, set at checkout time, falling back to a
 // stripe_subscription_id lookup), invoice.payment_failed (pushes a
-// notification to the org's owner/admin — does NOT write subscription_status
+// notification to that individual — does NOT write subscription_status
 // itself, since the authoritative status change follows moments later via
 // customer.subscription.updated and writing from both would race it).
+//
+// Per-user billing, not per-org: every write here targets a single
+// `profiles` row, not `organizations` — a person's subscription follows
+// them across every org/tour they belong to, matching Master Tour's real
+// pricing model.
 //
 // Every event is deduped by id against stripe_webhook_events
 // (0036_billing_notifications_and_seat_sync.sql) before processing —
 // Stripe explicitly documents that webhooks can be delivered more than
-// once. The org-status writes above are naturally idempotent (they just
-// overwrite with the latest state), but the payment-failed notification
-// below is a side effect, not a state write, and side effects aren't
-// idempotent for free — without the dedup, a redelivered event could
-// alert an admin twice for the same failure.
+// once. The profile-status writes below are naturally idempotent (they
+// just overwrite with the latest state), but the payment-failed
+// notification is a side effect, not a state write, and side effects
+// aren't idempotent for free — without the dedup, a redelivered event
+// could alert someone twice for the same failure.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@^22.4.0";
 
@@ -52,11 +57,13 @@ function getStripe(): Stripe {
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 // Stripe's subscription statuses fold down onto the existing 5-value
-// subscription_status enum (0001_init.sql) rather than growing the enum
-// to match Stripe's vocabulary one-for-one — the app only ever needs to
-// ask "is this org locked," a question these 5 values already answer.
-// 'trialing' is unreachable in practice (no Stripe-side trial is used —
-// see create-checkout-session), kept only for completeness/future-proofing.
+// subscription_status enum (0001_init.sql, now also on profiles per
+// 0037_per_user_billing.sql) rather than growing the enum to match
+// Stripe's vocabulary one-for-one — the app only ever needs to ask "is
+// this person's billing active," a question these 5 values already
+// answer. 'trialing' is unreachable in practice (no Stripe-side trial is
+// used — see create-checkout-session), kept only for completeness/
+// future-proofing.
 function mapStripeStatus(status: Stripe.Subscription.Status): "trialing" | "active" | "past_due" | "canceled" {
   switch (status) {
     case "active":
@@ -78,38 +85,30 @@ function mapStripeStatus(status: Stripe.Subscription.Status): "trialing" | "acti
   }
 }
 
-async function updateOrgFromSubscription(orgId: string, subscription: Stripe.Subscription) {
+async function updateProfileFromSubscription(userId: string, subscription: Stripe.Subscription) {
   const price = subscription.items.data[0]?.price;
   const interval = price?.recurring?.interval === "year" ? "annual" : price?.recurring?.interval === "month" ? "monthly" : null;
-  // current_period_end's location has moved between Stripe API versions
-  // (subscription-item-level in newer ones, subscription-level in
-  // older) — read whichever is actually present rather than assume one.
-  const currentPeriodEnd =
-    (subscription.items.data[0] as unknown as { current_period_end?: number })?.current_period_end ??
-    (subscription as unknown as { current_period_end?: number }).current_period_end ??
-    null;
 
   const { error } = await admin
-    .from("organizations")
+    .from("profiles")
     .update({
       stripe_subscription_id: subscription.id,
       subscription_status: mapStripeStatus(subscription.status),
       subscription_interval: interval,
       stripe_price_id: price?.id ?? null,
-      subscription_renews_at: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
     })
-    .eq("id", orgId);
-  if (error) console.error("Failed to update organization from subscription event:", error);
+    .eq("id", userId);
+  if (error) console.error("Failed to update profile from subscription event:", error);
 }
 
-async function resolveOrgId(subscription: Stripe.Subscription): Promise<string | null> {
-  const fromMetadata = subscription.metadata?.organization_id;
+async function resolveUserId(subscription: Stripe.Subscription): Promise<string | null> {
+  const fromMetadata = subscription.metadata?.user_id;
   if (fromMetadata) return fromMetadata;
 
   // Fallback for events that don't carry the metadata directly — look up
   // by the subscription id we stored on checkout.session.completed.
   const { data } = await admin
-    .from("organizations")
+    .from("profiles")
     .select("id")
     .eq("stripe_subscription_id", subscription.id)
     .maybeSingle();
@@ -137,32 +136,25 @@ async function notifyPaymentFailed(invoice: Stripe.Invoice) {
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
 
-  const { data: org } = await admin
-    .from("organizations")
-    .select("id, name, subscription_status")
-    .eq("billing_customer_id", customerId)
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, subscription_status")
+    .eq("stripe_customer_id", customerId)
     .maybeSingle();
-  if (!org) return;
+  if (!profile) return;
 
   // Only alert on the *first* failure for this billing cycle — once
-  // customer.subscription.updated has already flipped the org to
+  // customer.subscription.updated has already flipped this person to
   // past_due/canceled, Stripe's retry schedule will keep sending
   // invoice.payment_failed for the same underlying problem, and none of
-  // those are new news to the admin.
-  if (org.subscription_status === "past_due" || org.subscription_status === "canceled") return;
-
-  const { data: members } = await admin
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", org.id)
-    .in("role", ["owner", "admin"]);
-  const targets = (members ?? []).map((r: { user_id: string }) => r.user_id);
+  // those are new news to them.
+  if (profile.subscription_status === "past_due" || profile.subscription_status === "canceled") return;
 
   await sendPushToUsers(
-    targets,
-    `Payment failed — ${org.name}`,
-    "We couldn't process your payment. Update your billing to avoid losing access.",
-    { type: "payment_failed", organizationId: org.id }
+    [profile.id],
+    "Payment failed",
+    "We couldn't process your payment. Update your billing to keep your manager access.",
+    { type: "payment_failed" }
   );
 }
 
@@ -205,36 +197,36 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const orgId = session.client_reference_id;
-        if (orgId && session.subscription) {
+        const userId = session.client_reference_id;
+        if (userId && session.subscription) {
           const subscription = await getStripe().subscriptions.retrieve(
             typeof session.subscription === "string" ? session.subscription : session.subscription.id
           );
           if (session.customer) {
             await admin
-              .from("organizations")
-              .update({ billing_customer_id: typeof session.customer === "string" ? session.customer : session.customer.id })
-              .eq("id", orgId);
+              .from("profiles")
+              .update({ stripe_customer_id: typeof session.customer === "string" ? session.customer : session.customer.id })
+              .eq("id", userId);
           }
-          await updateOrgFromSubscription(orgId, subscription);
+          await updateProfileFromSubscription(userId, subscription);
         }
         break;
       }
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        const orgId = await resolveOrgId(subscription);
-        if (orgId) {
+        const userId = await resolveUserId(subscription);
+        if (userId) {
           if (event.type === "customer.subscription.deleted") {
             await admin
-              .from("organizations")
+              .from("profiles")
               .update({ subscription_status: "canceled", stripe_subscription_id: null })
-              .eq("id", orgId);
+              .eq("id", userId);
           } else {
-            await updateOrgFromSubscription(orgId, subscription);
+            await updateProfileFromSubscription(userId, subscription);
           }
         } else {
-          console.error("Could not resolve organization for subscription event:", subscription.id);
+          console.error("Could not resolve user for subscription event:", subscription.id);
         }
         break;
       }

@@ -6,27 +6,13 @@
 // from a shared secret (x-cron-secret header vs. the CRON_SECRET function
 // secret) instead of a Supabase JWT — verify_jwt = false in config.toml.
 //
-// Does two unrelated things in one run purely because they're both cheap,
-// once-a-day, whole-organizations-table sweeps:
-//   1. Warns orgs whose trial ends within 3 days (once per trial, tracked
-//      via organizations.trial_warning_sent_at) — closes the "hard lock
-//      with zero notice" gap.
-//   2. Resyncs seat count → Stripe quantity for every actively-subscribed
-//      org, closing the gap where sync-org-seats only fires on manual
-//      button-press or member *removal* — an invite acceptance (which
-//      happens via a DB trigger, not a client screen) never had a natural
-//      call site to resync from. Up to 24h of staleness between a roster
-//      change and the Stripe quantity catching up, which is an acceptable
-//      trade for "not pushing every single invite straight to Stripe" —
-//      see sync-org-seats's own header for why that's deliberate.
+// Per-user billing, not per-org (0037_per_user_billing.sql): warns
+// individuals whose own trial ends within 3 days (once per trial, tracked
+// via profiles.trial_warning_sent_at) — closes the "soft-demote with zero
+// notice" gap. There's no seat-resync sweep anymore — "seats" don't exist
+// under this model; crew access is free and unlimited, and everyone else
+// pays for their own individual access regardless of anyone else's roster.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import Stripe from "npm:stripe@^22.4.0";
-
-function getStripe(): Stripe {
-  const key = Deno.env.get("STRIPE_SECRET_KEY");
-  if (!key) throw new Error("STRIPE_SECRET_KEY is not set — run `npx supabase secrets set STRIPE_SECRET_KEY=...`");
-  return new Stripe(key);
-}
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -51,16 +37,11 @@ async function sendPushToUsers(userIds: string[], title: string, body: string, d
   return tokens.length;
 }
 
-async function orgAdminUserIds(orgId: string): Promise<string[]> {
-  const { data } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["owner", "admin"]);
-  return (data ?? []).map((r: { user_id: string }) => r.user_id);
-}
-
 async function runTrialWarnings() {
   const in3Days = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: orgs, error } = await admin
-    .from("organizations")
-    .select("id, name, trial_ends_at")
+  const { data: users, error } = await admin
+    .from("profiles")
+    .select("id, trial_ends_at")
     .eq("subscription_status", "trialing")
     .not("trial_ends_at", "is", null)
     .lte("trial_ends_at", in3Days)
@@ -72,59 +53,18 @@ async function runTrialWarnings() {
   }
 
   let sent = 0;
-  for (const org of orgs ?? []) {
-    const daysLeft = Math.max(1, Math.ceil((new Date(org.trial_ends_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
-    const targets = await orgAdminUserIds(org.id);
+  for (const user of users ?? []) {
+    const daysLeft = Math.max(1, Math.ceil((new Date(user.trial_ends_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
     await sendPushToUsers(
-      targets,
-      `Trial ending soon — ${org.name}`,
-      `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Subscribe to keep your team's access.`,
-      { type: "trial_ending", organizationId: org.id }
+      [user.id],
+      "Trial ending soon",
+      `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Subscribe to keep your manager access.`,
+      { type: "trial_ending" }
     );
-    await admin.from("organizations").update({ trial_warning_sent_at: new Date().toISOString() }).eq("id", org.id);
+    await admin.from("profiles").update({ trial_warning_sent_at: new Date().toISOString() }).eq("id", user.id);
     sent++;
   }
   return sent;
-}
-
-async function runSeatResync() {
-  const { data: orgs, error } = await admin
-    .from("organizations")
-    .select("id, stripe_subscription_id")
-    .eq("subscription_status", "active")
-    .not("stripe_subscription_id", "is", null);
-  if (error) {
-    console.error("Seat resync query failed:", error);
-    return 0;
-  }
-
-  let synced = 0;
-  for (const org of orgs ?? []) {
-    // Same query compute_org_seat_count runs, done directly here since
-    // that RPC's is_member_of_org(..., auth.uid()) guard returns null for
-    // any caller without a real auth session (see file header).
-    const { data: tourMembers, error: countError } = await admin
-      .from("tour_members")
-      .select("user_id, tours!inner(organization_id)")
-      .eq("tours.organization_id", org.id);
-    if (countError) {
-      console.error(`Seat count query failed for org ${org.id}:`, countError);
-      continue;
-    }
-    const seatCount = Math.max(new Set((tourMembers ?? []).map((r: { user_id: string }) => r.user_id)).size, 1);
-
-    try {
-      const subscription = await getStripe().subscriptions.retrieve(org.stripe_subscription_id!);
-      const item = subscription.items.data[0];
-      if (item && item.quantity !== seatCount) {
-        await getStripe().subscriptionItems.update(item.id, { quantity: seatCount });
-        synced++;
-      }
-    } catch (err) {
-      console.error(`Stripe seat resync failed for org ${org.id}:`, err);
-    }
-  }
-  return synced;
 }
 
 Deno.serve(async (req) => {
@@ -139,8 +79,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const [trialWarningsSent, seatSyncs] = await Promise.all([runTrialWarnings(), runSeatResync()]);
-    return new Response(JSON.stringify({ trialWarningsSent, seatSyncs }), {
+    const trialWarningsSent = await runTrialWarnings();
+    return new Response(JSON.stringify({ trialWarningsSent }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
