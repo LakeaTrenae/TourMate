@@ -34,6 +34,7 @@ import {
 import { supabase, functionsUrl } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { registerForPushNotifications } from '../lib/pushNotifications';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
 import { useTheme, fonts, type ThemeColors, type ThemePreference } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
@@ -318,7 +319,7 @@ export function SettingsScreen({ navigation }: Props) {
     setDeleting(false);
 
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Failed to delete account.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to delete account.'));
       return;
     }
     // The account is gone server-side; clear the local session so

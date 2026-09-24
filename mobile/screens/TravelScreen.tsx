@@ -28,6 +28,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -132,7 +133,7 @@ export function TravelScreen({ route, navigation }: Props) {
     const { data, error } = await supabase.functions.invoke('flight-status', { body: { flightId } });
     setCheckingStatusId(null);
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Failed to check flight status.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to check flight status.'));
       return;
     }
     await load();

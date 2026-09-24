@@ -11,16 +11,27 @@
  * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
  * review — see lib/theme.tsx.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { createElement, useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+// react-native-webview has no real web implementation — importing it
+// unconditionally crashes the whole app on web ("React Native WebView
+// does not support this platform"), and since React has no default error
+// boundary here, that crash blanks the ENTIRE app, not just this screen,
+// the moment anyone opens Route on web. A plain `require()` gated by
+// Platform.OS (not a static `import`) is what actually keeps that module
+// from being evaluated at all on web — a static import gets bundled and
+// evaluated regardless of any runtime Platform check around its usage.
+// On web, a bare DOM <iframe srcDoc={...}> is the direct equivalent of
+// WebView's `source={{ html }}` — same self-contained-HTML use case.
+const WebView = Platform.OS === 'web' ? null : (require('react-native-webview').WebView as typeof import('react-native-webview').WebView);
 
 import { supabase } from '../lib/supabase';
 import { formatDateOnly } from '../lib/dates';
 import { haversineDistanceMiles } from '../lib/geo';
 import { buildRouteMapHtml } from '../lib/routeMapHtml';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -112,7 +123,7 @@ export function RouteScreen({ route, navigation }: Props) {
     const { data, error } = await supabase.functions.invoke('route-directions', { body: { tourId } });
     setComputingRoutes(false);
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Failed to calculate driving routes.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to calculate driving routes.'));
       return;
     }
     const map: Record<string, RealSegment> = { ...realSegments };
@@ -167,20 +178,35 @@ export function RouteScreen({ route, navigation }: Props) {
 
       {showMap && stops.length > 0 ? (
         <View style={styles.mapContainer}>
-          <WebView
-            source={{
-              html: buildRouteMapHtml(
-                stops
-                  .filter((s): s is Stop & { latitude: number; longitude: number } => s.latitude != null && s.longitude != null)
-                  .map((s) => ({
-                    label: `${formatDateOnly(s.date, { month: 'short', day: 'numeric' })} — ${s.venueName ?? 'No venue set'}`,
-                    latitude: s.latitude,
-                    longitude: s.longitude,
-                  }))
-              ),
-            }}
-            style={styles.map}
-          />
+          {Platform.OS === 'web'
+            ? createElement('iframe', {
+                srcDoc: buildRouteMapHtml(
+                  stops
+                    .filter((s): s is Stop & { latitude: number; longitude: number } => s.latitude != null && s.longitude != null)
+                    .map((s) => ({
+                      label: `${formatDateOnly(s.date, { month: 'short', day: 'numeric' })} — ${s.venueName ?? 'No venue set'}`,
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                    }))
+                ),
+                style: { flex: 1, border: 'none' },
+              })
+            : WebView && (
+                <WebView
+                  source={{
+                    html: buildRouteMapHtml(
+                      stops
+                        .filter((s): s is Stop & { latitude: number; longitude: number } => s.latitude != null && s.longitude != null)
+                        .map((s) => ({
+                          label: `${formatDateOnly(s.date, { month: 'short', day: 'numeric' })} — ${s.venueName ?? 'No venue set'}`,
+                          latitude: s.latitude,
+                          longitude: s.longitude,
+                        }))
+                    ),
+                  }}
+                  style={styles.map}
+                />
+              )}
           {stops.some((s) => s.latitude == null || s.longitude == null) && (
             <Text style={styles.mapNote}>Some dates are missing venue coordinates and aren't shown on the map.</Text>
           )}

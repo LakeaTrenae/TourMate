@@ -31,6 +31,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 
 type MyBilling = {
@@ -111,7 +112,7 @@ export function BillingScreen() {
     });
     setSubscribing(null);
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Failed to start checkout.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to start checkout.'));
       return;
     }
     await Linking.openURL(data.url);
@@ -125,7 +126,7 @@ export function BillingScreen() {
     });
     setManagingBilling(false);
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Failed to open billing management.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to open billing management.'));
       return;
     }
     await Linking.openURL(data.url);

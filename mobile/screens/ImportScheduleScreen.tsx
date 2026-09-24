@@ -37,6 +37,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { readFileAsBase64 } from '../lib/files';
 import { newId } from '../lib/ids';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -96,8 +97,7 @@ export function ImportScheduleScreen({ route, navigation }: Props) {
         },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) throw new Error(await getInvokeErrorMessage(error, data, 'Extraction failed.'));
 
       const raw: RawShow[] = data?.shows ?? [];
       if (raw.length === 0) {

@@ -23,6 +23,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { supabase } from '../lib/supabase';
 import { readFileAsBase64 } from '../lib/files';
 import { newId } from '../lib/ids';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -73,8 +74,7 @@ export function ImportBudgetScreen({ route, navigation }: Props) {
         body: { tourId, fileName: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream', base64Data },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) throw new Error(await getInvokeErrorMessage(error, data, 'Extraction failed.'));
 
       const raw: RawItem[] = data?.items ?? [];
       if (raw.length === 0) {

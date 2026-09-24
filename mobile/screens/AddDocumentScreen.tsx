@@ -29,6 +29,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { newId } from '../lib/ids';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { fetchTourRoster, type RosterMember } from '../lib/roster';
 import { formatDepartment } from '../lib/format';
 import { readFileAsBase64 } from '../lib/files';
@@ -130,8 +131,7 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       const { data, error } = await supabase.functions.invoke('extract-document-metadata', {
         body: { tourId, fileName: file.name, mimeType: file.mimeType ?? 'application/octet-stream', base64Data },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) throw new Error(await getInvokeErrorMessage(error, data, 'Extraction failed.'));
 
       if (data?.title) setTitle(data.title);
       if (data?.category && CATEGORIES.some((c) => c.value === data.category)) setCategory(data.category);

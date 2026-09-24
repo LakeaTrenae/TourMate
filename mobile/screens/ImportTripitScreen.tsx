@@ -19,6 +19,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 
 import { supabase } from '../lib/supabase';
 import { newId } from '../lib/ids';
+import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -60,7 +61,7 @@ export function ImportTripitScreen({ route, navigation }: Props) {
     setPhase('extracting');
     const { data, error } = await supabase.functions.invoke('extract-tripit', { body: { tourId } });
     if (error || data?.error) {
-      setErrorMessage(data?.error ?? error?.message ?? 'Import failed.');
+      setErrorMessage(await getInvokeErrorMessage(error, data, 'Import failed.'));
       setPhase('idle');
       return;
     }
