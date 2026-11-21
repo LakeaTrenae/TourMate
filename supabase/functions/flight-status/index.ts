@@ -1,16 +1,27 @@
 // flight-status — Supabase Edge Function (Deno)
 //
-// "Real-Time Flight Tracking with FlightAware" from Master Tour's feature
-// list. Looks up a flight's live status via FlightAware's AeroAPI
-// (https://aeroapi.flightaware.com — field names below confirmed against
-// their published OpenAPI spec, not guessed) and writes the result onto
-// the existing `flights` row (0040_setlists_flight_routing_calendar.sql's
+// "Real-Time Flight Tracking" from Master Tour's feature list. Looks up a
+// flight's live status via AviationStack's Flights API
+// (https://api.aviationstack.com — field names below confirmed against
+// their published response examples, not guessed) and writes the result
+// onto the existing `flights` row (0040_setlists_flight_routing_calendar.sql's
 // new columns).
 //
-// Requires a FLIGHTAWARE_API_KEY secret — sign up for AeroAPI at
-// https://www.flightaware.com/commercial/aeroapi/ (paid, usage-based —
-// there's no free tier) and run:
-//   npx supabase secrets set FLIGHTAWARE_API_KEY=your-key-here
+// AviationStack over FlightAware's AeroAPI deliberately — its free tier
+// needs no credit card on file (100 requests/month), which matters before
+// this app has real paying traffic to justify a metered-billing API. The
+// real limitation of that free tier: it only covers REAL-TIME flight
+// data (today's flights), not historical or far-future ones — a lookup
+// on a flight that isn't scheduled for today will come back empty. That's
+// an acceptable tradeoff here: a flight's live status is only meaningful
+// close to its actual departure day anyway, which is exactly when
+// someone would realistically tap "Refresh live status." Revisit if a
+// manager needs this further out; the Basic paid plan adds historical/
+// future lookups with the same request shape.
+//
+// Requires an AVIATIONSTACK_API_KEY secret — sign up free (no card) at
+// https://aviationstack.com/signup/free, then:
+//   npx supabase secrets set AVIATIONSTACK_API_KEY=your-key-here
 // Until that's set, this function returns a clear 500 explaining exactly
 // that, rather than a flight silently never updating.
 //
@@ -38,31 +49,32 @@ function jsonResponse(body: unknown, status = 200) {
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-type AeroApiFlight = {
-  ident: string;
-  scheduled_out: string | null;
-  estimated_out: string | null;
-  actual_out: string | null;
-  estimated_in: string | null;
-  actual_in: string | null;
-  departure_delay: number | null; // seconds
-  cancelled: boolean;
-  diverted: boolean;
+type AviationStackFlight = {
+  flight_date: string; // YYYY-MM-DD
+  flight_status: "scheduled" | "active" | "landed" | "cancelled" | "incident" | "diverted";
+  departure: { scheduled: string | null; estimated: string | null; actual: string | null; delay: number | null };
+  arrival: { scheduled: string | null; estimated: string | null; actual: string | null; delay: number | null };
 };
 
-// AeroAPI has no single free-text "status" field on a flight object (its
-// schema only exposes cancelled/diverted plus the actual/estimated
-// timestamps) — this derives the same kind of human summary Master Tour
-// shows from those, rather than inventing a field that doesn't exist.
-function deriveStatus(f: AeroApiFlight): { status: string; detail: string } {
-  if (f.cancelled) return { status: "cancelled", detail: "Cancelled" };
-  if (f.diverted) return { status: "diverted", detail: "Diverted" };
-  if (f.actual_in) return { status: "landed", detail: "Landed" };
-  if (f.actual_out) return { status: "en_route", detail: "En Route" };
-  if (f.departure_delay && f.departure_delay > 300) {
-    return { status: "delayed", detail: `Delayed ~${Math.round(f.departure_delay / 60)} min` };
+// Unlike AeroAPI, AviationStack's own flight_status is already a clean,
+// human-meaningful enum — no need to derive one from timestamps, just
+// turn it (plus any delay minutes) into the short label the UI shows.
+function describeStatus(f: AviationStackFlight): { status: string; detail: string } {
+  const delay = f.departure.delay ?? f.arrival.delay;
+  switch (f.flight_status) {
+    case "cancelled":
+      return { status: "cancelled", detail: "Cancelled" };
+    case "diverted":
+      return { status: "diverted", detail: "Diverted" };
+    case "incident":
+      return { status: "incident", detail: "Incident reported" };
+    case "landed":
+      return { status: "landed", detail: "Landed" };
+    case "active":
+      return { status: "en_route", detail: delay && delay > 5 ? `En Route — delayed ~${delay} min` : "En Route" };
+    default:
+      return { status: "scheduled", detail: delay && delay > 5 ? `Delayed ~${delay} min` : "On Time" };
   }
-  return { status: "scheduled", detail: "On Time" };
 }
 
 Deno.serve(async (req) => {
@@ -95,52 +107,55 @@ Deno.serve(async (req) => {
     if (flightError || !flight) return jsonResponse({ error: "Flight not found, or you don't have access to it." }, 404);
     if (!flight.flight_number) return jsonResponse({ error: "This flight has no flight number set." }, 400);
 
-    const apiKey = Deno.env.get("FLIGHTAWARE_API_KEY");
+    const apiKey = Deno.env.get("AVIATIONSTACK_API_KEY");
     if (!apiKey) {
       return jsonResponse(
-        { error: "FLIGHTAWARE_API_KEY is not set — sign up for AeroAPI at flightaware.com/commercial/aeroapi and run `npx supabase secrets set FLIGHTAWARE_API_KEY=...`" },
+        { error: "AVIATIONSTACK_API_KEY is not set — sign up free (no card) at aviationstack.com/signup/free and run `npx supabase secrets set AVIATIONSTACK_API_KEY=...`" },
         500
       );
     }
 
-    // Query a ±2 day window around the stored departure time — AeroAPI
-    // returns every recent/scheduled flight under this ident, and a
-    // flight number alone (e.g. "AA123") isn't unique across dates.
-    const departure = new Date(flight.departure_time);
-    const start = new Date(departure.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
-    const end = new Date(departure.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    const ident = encodeURIComponent(flight.flight_number.replace(/\s+/g, ""));
-
-    const aeroRes = await fetch(
-      `https://aeroapi.flightaware.com/aeroapi/flights/${ident}?start=${start}&end=${end}&max_pages=1`,
-      { headers: { "x-apikey": apiKey, Accept: "application/json" } }
+    // flight_iata expects the airline IATA code + number with no space
+    // (e.g. "DL1403") — same format flight_number is already stored in.
+    const flightIata = encodeURIComponent(flight.flight_number.replace(/\s+/g, ""));
+    const asRes = await fetch(
+      `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightIata}`
     );
-    if (!aeroRes.ok) {
-      const body = await aeroRes.text();
-      return jsonResponse({ error: `FlightAware lookup failed (${aeroRes.status}): ${body.slice(0, 300)}` }, 502);
+    if (!asRes.ok) {
+      const body = await asRes.text();
+      return jsonResponse({ error: `AviationStack lookup failed (${asRes.status}): ${body.slice(0, 300)}` }, 502);
     }
-    const aeroData = (await aeroRes.json()) as { flights?: AeroApiFlight[] };
-    const flights = aeroData.flights ?? [];
+    const asData = (await asRes.json()) as { data?: AviationStackFlight[]; error?: { message: string } };
+    if (asData.error) {
+      return jsonResponse({ error: `AviationStack error: ${asData.error.message}` }, 502);
+    }
+    const flights = asData.data ?? [];
     if (flights.length === 0) {
-      return jsonResponse({ error: `No FlightAware data found for ${flight.flight_number} near this date.` }, 404);
+      return jsonResponse(
+        { error: `No live data for ${flight.flight_number} — the free AviationStack plan only covers flights scheduled for today, not ones further out.` },
+        404
+      );
     }
 
-    // Pick whichever result's scheduled departure is closest to our own
-    // stored time — the ident-only query can return more than one date.
-    const target = departure.getTime();
-    const best = flights.reduce((closest, f) => {
-      const t = f.scheduled_out ? new Date(f.scheduled_out).getTime() : Infinity;
-      const closestT = closest.scheduled_out ? new Date(closest.scheduled_out).getTime() : Infinity;
-      return Math.abs(t - target) < Math.abs(closestT - target) ? f : closest;
-    });
+    // Pick whichever result's flight_date is closest to our own stored
+    // departure date — the free real-time endpoint should really only
+    // ever return one match (today's instance), but this stays robust if
+    // it ever returns more than one.
+    const targetDate = flight.departure_time.slice(0, 10);
+    const best = flights.reduce((closest, f) =>
+      Math.abs(new Date(f.flight_date).getTime() - new Date(targetDate).getTime()) <
+      Math.abs(new Date(closest.flight_date).getTime() - new Date(targetDate).getTime())
+        ? f
+        : closest
+    );
 
-    const { status, detail } = deriveStatus(best);
+    const { status, detail } = describeStatus(best);
 
     const update = {
       status,
       status_detail: detail,
-      actual_departure_time: best.actual_out,
-      actual_arrival_time: best.actual_in,
+      actual_departure_time: best.departure.actual,
+      actual_arrival_time: best.arrival.actual,
       status_checked_at: new Date().toISOString(),
     };
     const { error: updateError } = await admin.from("flights").update(update).eq("id", flightId);
