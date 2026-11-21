@@ -311,7 +311,7 @@ export function TourDashboardScreen({ route, navigation }: Props) {
             {nextShow.venueName ? `${nextShow.venueName} · ` : ''}
             {formatDateOnly(nextShow.date, { month: 'short', day: 'numeric' })}
           </Text>
-          {cityPhoto.photographer && <Text style={styles.roadCardCredit}>Photo by {cityPhoto.photographer} on Pexels</Text>}
+          {cityPhoto.photographer && <Text style={styles.roadCardCredit}>Photo via {cityPhoto.photographer}</Text>}
         </ImageBackground>
       )}
 

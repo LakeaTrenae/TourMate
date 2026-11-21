@@ -1,30 +1,33 @@
 // city-photo — Supabase Edge Function (Deno)
 //
 // Backs the "on the road" card on Tour Dashboard — a real photo of the
-// next stop's city instead of a flat banner. Looks up a landscape photo
-// via Pexels' Search API (https://www.pexels.com/api/documentation/)
-// and caches the result in city_photos (0046_city_photos.sql), keyed by
-// (city, state), since a city's photo essentially never needs
-// refetching — no point re-querying Pexels every time someone opens the
-// same tour's dashboard.
+// next stop's city instead of a flat banner. Looks up a photo via
+// Wikipedia's public REST summary endpoint
+// (https://en.wikipedia.org/api/rest_v1/page/summary/<title>) and caches
+// the result in city_photos (0046_city_photos.sql), keyed by (city,
+// state), since a city's photo essentially never needs refetching.
 //
-// Pexels over Unsplash deliberately — Pexels' free tier (200 requests/
-// hour, 20,000/month) needs no credit card and is far more generous than
-// Unsplash's demo-tier 50/hour, which matters before this app has real
-// paying traffic to justify anything metered. Same "pick the free option
-// first" call already made for routing (OpenRouteService) and flight
-// tracking (AviationStack).
-//
-// Requires a PEXELS_API_KEY secret — sign up free (no card) at
-// https://www.pexels.com/api/, then:
-//   npx supabase secrets set PEXELS_API_KEY=your-key-here
-// Until that's set, this returns a clear 500 rather than a silently
-// missing photo.
+// Originally built against Pexels' Search API, but Pexels paused new API
+// key issuance before one could be requested for this project — swapped
+// to Wikipedia instead, which needs NO key or account at all (just a
+// descriptive User-Agent header, per Wikimedia's API etiquette policy:
+// https://meta.wikimedia.org/wiki/User-Agent_policy), so this can never
+// get blocked on a provisioning pause again. Tries "<City>, <State>"
+// first, then falls back to the bare city name if that article doesn't
+// exist or has no photo — e.g. "Nashville, Tennessee" has one, but a
+// smaller town might only resolve under its bare name.
 //
 // This isn't tour-scoped data (a photo of "Nashville" is the same for
 // every tour passing through it), so the only authorization check is
 // "is this a signed-in user of the app at all" — no tour-membership
 // lookup needed, unlike route-directions/flight-status.
+//
+// Wikipedia images are usually CC-BY-SA — the city_photos.photographer/
+// photographer_url columns (named for the Pexels era) now carry
+// "Wikipedia" and a link back to the source article rather than a named
+// photographer, which is a reasonable-faith attribution for a city
+// skyline photo but not a substitute for the specific file's own
+// Commons license page if this ever needs to be audited more strictly.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -46,30 +49,29 @@ const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE
 // need to refresh.
 const CACHE_MAX_AGE_DAYS = 180;
 
-type PexelsPhoto = {
-  url: string;
-  photographer: string;
-  src: { large2x: string; large: string };
+const WIKIPEDIA_USER_AGENT = "TourMate/1.0 (touring production management app; city-photo edge function)";
+
+type WikipediaSummary = {
+  thumbnail?: { source: string };
+  originalimage?: { source: string };
+  content_urls?: { desktop?: { page?: string } };
 };
 
-async function searchPexels(apiKey: string, city: string, state: string) {
-  const query = state ? `${city}, ${state}` : city;
-  const res = await fetch(
-    `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
-    { headers: { Authorization: apiKey } }
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Pexels failed (${res.status}): ${body.slice(0, 300)}`);
+async function searchWikipedia(city: string, state: string) {
+  const titles = state ? [`${city}, ${state}`, city] : [city];
+  for (const title of titles) {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, {
+      headers: { "User-Agent": WIKIPEDIA_USER_AGENT },
+    });
+    if (!res.ok) continue; // 404 for this title — try the next fallback, not a hard error
+
+    const data = (await res.json()) as WikipediaSummary;
+    const photoUrl = data.originalimage?.source ?? data.thumbnail?.source;
+    if (!photoUrl) continue; // article exists but has no photo (common for a disambiguation page)
+
+    return { photoUrl, pageUrl: data.content_urls?.desktop?.page ?? null };
   }
-  const data = (await res.json()) as { photos?: PexelsPhoto[] };
-  const photo = data.photos?.[0];
-  if (!photo) return null;
-  return {
-    photoUrl: photo.src.large2x ?? photo.src.large,
-    photographer: photo.photographer,
-    photographerUrl: photo.url,
-  };
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -110,15 +112,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("PEXELS_API_KEY");
-    if (!apiKey) {
-      return jsonResponse(
-        { error: "PEXELS_API_KEY is not set — sign up free (no card) at pexels.com/api and run `npx supabase secrets set PEXELS_API_KEY=...`" },
-        500
-      );
-    }
-
-    const result = await searchPexels(apiKey, city, normalizedState);
+    const result = await searchWikipedia(city, normalizedState);
     if (!result) {
       // No crash, no stale cache write — just "nothing found," which the
       // client already handles by not rendering the card at all.
@@ -130,14 +124,14 @@ Deno.serve(async (req) => {
         city,
         state: normalizedState,
         photo_url: result.photoUrl,
-        photographer: result.photographer,
-        photographer_url: result.photographerUrl,
+        photographer: "Wikipedia",
+        photographer_url: result.pageUrl,
         fetched_at: new Date().toISOString(),
       },
       { onConflict: "city,state" }
     );
 
-    return jsonResponse({ photoUrl: result.photoUrl, photographer: result.photographer, photographerUrl: result.photographerUrl });
+    return jsonResponse({ photoUrl: result.photoUrl, photographer: "Wikipedia", photographerUrl: result.pageUrl });
   } catch (err) {
     console.error(err);
     return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
