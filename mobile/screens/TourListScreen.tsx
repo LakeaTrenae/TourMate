@@ -120,11 +120,24 @@ export function TourListScreen({ navigation }: Props) {
   // One batched call for every cover photo on screen rather than N signed-
   // URL requests — tour-covers is a private bucket, so a plain public URL
   // won't work here the way it does for the public `avatars` bucket.
+  //
+  // `tours` is `toursData ?? []` above — a brand-new array reference on
+  // every render whenever toursData is still null/undefined, which would
+  // make a `[tours]` dependency re-run this effect every render (setState
+  // → re-render → new `[]` → effect fires again → ...). Depending on a
+  // derived primitive string instead sidesteps that entirely; the
+  // functional setCoverUrls update below also avoids creating a new `{}`
+  // reference when the result is already empty, as a second guard.
   const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
+  const coverPathsKey = tours
+    .filter((t) => t.cover_photo_path)
+    .map((t) => `${t.id}:${t.cover_photo_path}`)
+    .join(',');
+
   useEffect(() => {
     const withCovers = tours.filter((t) => t.cover_photo_path);
     if (withCovers.length === 0) {
-      setCoverUrls({});
+      setCoverUrls((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       return;
     }
     supabase.storage
@@ -138,7 +151,8 @@ export function TourListScreen({ navigation }: Props) {
         });
         setCoverUrls(next);
       });
-  }, [tours]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverPathsKey]);
 
   // useFocusEffect (not a plain useEffect) so the list re-fetches every
   // time this screen comes back into focus — e.g. after backing out of a
