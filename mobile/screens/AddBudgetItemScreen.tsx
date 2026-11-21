@@ -54,6 +54,7 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [entryType, setEntryType] = useState<'income' | 'expense'>('expense');
+  const [phase, setPhase] = useState<'rehearsal' | 'tour'>('tour');
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [category, setCategory] = useState('');
@@ -124,6 +125,7 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
       description: description.trim() || null,
       amount: parsedAmount,
       entry_type: entryType,
+      phase,
       created_by: session.user.id,
       receipt_path: receiptPath,
       tour_date_id: tourDateId,
@@ -159,7 +161,7 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
       action: 'create',
       resourceType: 'budget_item',
       resourceId: itemId,
-      detail: { category: category.trim(), amount: parsedAmount, entry_type: entryType },
+      detail: { category: category.trim(), amount: parsedAmount, entry_type: entryType, phase },
     });
 
     setSubmitting(false);
@@ -182,6 +184,16 @@ export function AddBudgetItemScreen({ route, navigation }: Props) {
           onPress={() => setEntryType('income')}
         >
           <Text style={[styles.typeButtonText, entryType === 'income' && styles.typeButtonTextSelected]}>Income</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.sectionTitle}>Phase</Text>
+      <View style={styles.typeToggle}>
+        <Pressable style={[styles.typeButton, phase === 'rehearsal' && styles.typeButtonSelectedPhase]} onPress={() => setPhase('rehearsal')}>
+          <Text style={[styles.typeButtonText, phase === 'rehearsal' && styles.typeButtonTextSelected]}>Rehearsal</Text>
+        </Pressable>
+        <Pressable style={[styles.typeButton, phase === 'tour' && styles.typeButtonSelectedPhase]} onPress={() => setPhase('tour')}>
+          <Text style={[styles.typeButtonText, phase === 'tour' && styles.typeButtonTextSelected]}>Tour</Text>
         </Pressable>
       </View>
 
@@ -267,6 +279,7 @@ function createStyles(colors: ThemeColors) {
     },
     typeButtonSelectedExpense: { backgroundColor: colors.dangerSoft },
     typeButtonSelectedIncome: { backgroundColor: colors.successSoft },
+    typeButtonSelectedPhase: { backgroundColor: colors.accentSoft },
     typeButtonText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
     typeButtonTextSelected: { color: colors.text },
     sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },

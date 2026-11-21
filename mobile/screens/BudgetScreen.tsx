@@ -51,6 +51,7 @@ type BudgetItem = {
   description: string | null;
   amount: number;
   entry_type: 'income' | 'expense';
+  phase: 'rehearsal' | 'tour';
   created_at: string;
   receipt_path: string | null;
   tour_date_id: string | null;
@@ -60,13 +61,15 @@ type BudgetItem = {
 
 type Category = { id: string; name: string; color: string | null };
 
-type ViewMode = 'all' | 'week' | 'category' | 'deposits';
+type ViewMode = 'all' | 'week' | 'category' | 'phase' | 'deposits';
 const VIEW_MODES: { value: ViewMode; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'week', label: 'By Week' },
   { value: 'category', label: 'By Category' },
+  { value: 'phase', label: 'Rehearsal / Tour' },
   { value: 'deposits', label: 'Deposits' },
 ];
+const PHASE_LABELS: Record<BudgetItem['phase'], string> = { rehearsal: 'Rehearsal', tour: 'Tour' };
 
 function signedAmount(item: BudgetItem): number {
   return item.entry_type === 'income' ? Number(item.amount) : -Number(item.amount);
@@ -92,7 +95,7 @@ export function BudgetScreen({ route, navigation }: Props) {
     const [{ data, error }, { data: categoryRows, error: categoryError }] = await Promise.all([
       supabase
         .from('budget_items')
-        .select('id, category, category_id, description, amount, entry_type, created_at, receipt_path, tour_date_id, deposit_status, tour_date:tour_dates(date)')
+        .select('id, category, category_id, description, amount, entry_type, phase, created_at, receipt_path, tour_date_id, deposit_status, tour_date:tour_dates(date)')
         .eq('tour_id', tourId)
         .order('created_at', { ascending: false }),
       supabase.from('budget_categories').select('id, name, color').eq('tour_id', tourId).order('name', { ascending: true }),
@@ -247,6 +250,16 @@ export function BudgetScreen({ route, navigation }: Props) {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [items]);
 
+  // Always both buckets, even if one is empty — the point is to show
+  // rehearsal and tour as two distinct sections, not to hide whichever
+  // one happens to have no entries yet.
+  const phaseGroups = useMemo(() => {
+    return (['rehearsal', 'tour'] as const).map((phase) => {
+      const rows = items.filter((i) => i.phase === phase);
+      return { phase, label: PHASE_LABELS[phase], rows, net: rows.reduce((sum, i) => sum + signedAmount(i), 0) };
+    });
+  }, [items]);
+
   const depositItems = useMemo(() => items.filter((i) => i.deposit_status != null), [items]);
 
   function formatCurrency(n: number) {
@@ -266,6 +279,7 @@ export function BudgetScreen({ route, navigation }: Props) {
           <Text style={styles.category}>{item.category}</Text>
           {item.description && <Text style={styles.description}>{item.description}</Text>}
           <View style={styles.badgeRow}>
+            {item.phase === 'rehearsal' && <Text style={[styles.badge, styles.phaseBadge]}>REHEARSAL</Text>}
             {item.tour_date?.date && <Text style={styles.badge}>{formatDateOnly(item.tour_date.date, { month: 'short', day: 'numeric' })}</Text>}
             {item.deposit_status && <Text style={[styles.badge, styles.depositBadge]}>{item.deposit_status.toUpperCase()}</Text>}
           </View>
@@ -410,6 +424,20 @@ export function BudgetScreen({ route, navigation }: Props) {
               </View>
             ))}
           </>
+        ) : viewMode === 'phase' ? (
+          phaseGroups.map((group) => (
+            <View key={group.phase}>
+              <View style={styles.groupHeader}>
+                <Text style={styles.groupTitle}>{group.label}</Text>
+                <Text style={[styles.groupNet, { color: group.net >= 0 ? colors.success : colors.danger }]}>{formatCurrency(group.net)}</Text>
+              </View>
+              {group.rows.length === 0 ? (
+                <Text style={styles.emptyText}>No {group.label.toLowerCase()} entries yet.</Text>
+              ) : (
+                group.rows.map(renderItemRow)
+              )}
+            </View>
+          ))
         ) : depositItems.length === 0 ? (
           <Text style={styles.emptyText}>No deposits tracked yet — mark an entry as a deposit when adding it.</Text>
         ) : (
@@ -513,6 +541,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 2,
     },
     depositBadge: { color: colors.warn, backgroundColor: colors.warnSoft },
+    phaseBadge: { color: colors.spark, backgroundColor: colors.sparkSoft },
     receiptLink: { color: colors.accent, fontSize: 12, marginTop: 4, fontFamily: fonts.bodySemiBold },
     cardActions: { alignItems: 'flex-end', gap: 6 },
     amount: { fontSize: 15, fontFamily: fonts.monoMedium },

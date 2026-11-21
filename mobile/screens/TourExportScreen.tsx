@@ -30,7 +30,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { formatDateOnly } from '../lib/dates';
 import { buildTourExportHtml, type DaySheetData } from '../lib/dayPrint';
-import { buildBudgetCsv, buildGuestListCsv } from '../lib/csv';
+import { buildBudgetCsv, buildBudgetTemplateCsv, buildGuestListCsv, buildPayrollTemplateCsv } from '../lib/csv';
 import { buildTourIcs } from '../lib/ics';
 import { newId } from '../lib/ids';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
@@ -54,7 +54,7 @@ type TourDateRow = {
 };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
-type ExportKind = 'daysheets' | 'budget' | 'guestlist' | 'calendar';
+type ExportKind = 'daysheets' | 'budget' | 'guestlist' | 'calendar' | 'budget-template' | 'payroll-template';
 
 export function TourExportScreen({ route }: Props) {
   const { tourId, tourName } = route.params;
@@ -146,18 +146,42 @@ export function TourExportScreen({ route }: Props) {
     try {
       const { data, error } = await supabase
         .from('budget_items')
-        .select('category, description, amount, entry_type, deposit_status, tour_date:tour_dates(date)')
+        .select('category, description, amount, entry_type, phase, deposit_status, tour_date:tour_dates(date)')
         .eq('tour_id', tourId)
         .order('created_at', { ascending: true });
       if (error) throw new Error(error.message);
 
-      const rows = (data ?? []) as unknown as { category: string; description: string | null; amount: number; entry_type: 'income' | 'expense'; deposit_status: string | null; tour_date: { date: string } | null }[];
+      const rows = (data ?? []) as unknown as { category: string; description: string | null; amount: number; entry_type: 'income' | 'expense'; phase: 'rehearsal' | 'tour'; deposit_status: string | null; tour_date: { date: string } | null }[];
       if (rows.length === 0) {
         setErrorMessage('No budget entries yet.');
         return;
       }
-      const csv = buildBudgetCsv(rows.map((r) => ({ date: r.tour_date?.date ?? null, category: r.category, description: r.description, entry_type: r.entry_type, amount: r.amount, deposit_status: r.deposit_status })));
+      const csv = buildBudgetCsv(rows.map((r) => ({ date: r.tour_date?.date ?? null, category: r.category, description: r.description, entry_type: r.entry_type, phase: r.phase, amount: r.amount, deposit_status: r.deposit_status })));
       await deliverFile(csv, 'csv', 'text/csv');
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportBudgetTemplate() {
+    setErrorMessage(null);
+    setExporting('budget-template');
+    try {
+      await deliverFile(buildBudgetTemplateCsv(), 'csv', 'text/csv');
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportPayrollTemplate() {
+    setErrorMessage(null);
+    setExporting('payroll-template');
+    try {
+      await deliverFile(buildPayrollTemplateCsv(), 'csv', 'text/csv');
     } catch (err) {
       Alert.alert('Export failed', err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -262,10 +286,36 @@ export function TourExportScreen({ route }: Props) {
           styles={styles}
           colors={colors}
           title="Budget Summary"
-          description="Every income and expense entry as a CSV — opens in Excel, Numbers, or Google Sheets."
+          description="Every income and expense entry, grouped by Rehearsal/Tour phase and category with subtotals, as a CSV — opens in Excel, Numbers, or Google Sheets."
           buttonLabel="Export Budget CSV"
           onPress={handleExportBudget}
           loading={exporting === 'budget'}
+          disabled={exporting !== null}
+        />
+      )}
+
+      {isManager && (
+        <ExportCard
+          styles={styles}
+          colors={colors}
+          title="Budget Template"
+          description="A blank starter budget sheet with sensible example rows — fill it out offline, or hand it off."
+          buttonLabel="Download Budget Template"
+          onPress={handleExportBudgetTemplate}
+          loading={exporting === 'budget-template'}
+          disabled={exporting !== null}
+        />
+      )}
+
+      {isManager && (
+        <ExportCard
+          styles={styles}
+          colors={colors}
+          title="Payroll Template"
+          description="A blank per-person payroll sheet — rate, days, and computed total, split by Rehearsal/Tour."
+          buttonLabel="Download Payroll Template"
+          onPress={handleExportPayrollTemplate}
+          loading={exporting === 'payroll-template'}
           disabled={exporting !== null}
         />
       )}
