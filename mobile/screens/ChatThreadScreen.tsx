@@ -217,10 +217,10 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    error: { color: colors.danger, fontSize: 13, padding: 12, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, padding: 12, fontFamily: fonts.body },
     messageList: { flex: 1 },
     messageListContent: { padding: 16, flexGrow: 1 },
-    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', marginTop: 40, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', marginTop: 40, fontFamily: fonts.body },
     bubbleRow: { flexDirection: 'row', marginBottom: 8 },
     bubbleRowMine: { justifyContent: 'flex-end' },
     bubble: {
@@ -231,10 +231,10 @@ function createStyles(colors: ThemeColors) {
     },
     bubbleTheirs: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     bubbleMine: { backgroundColor: colors.accent },
-    senderName: { color: colors.accent, fontSize: 10, fontFamily: fonts.bodySemiBold, marginBottom: 2 },
-    bubbleText: { color: colors.text, fontSize: 15, fontFamily: fonts.body, lineHeight: 20 },
+    senderName: { color: colors.accent, fontSize: 12, fontFamily: fonts.bodySemiBold, marginBottom: 2 },
+    bubbleText: { color: colors.text, fontSize: 18, fontFamily: fonts.body, lineHeight: 20 },
     bubbleTextMine: { color: colors.onAccent },
-    bubbleTime: { color: colors.textFaint, fontSize: 10, fontFamily: fonts.mono, marginTop: 3, textAlign: 'right' },
+    bubbleTime: { color: colors.textFaint, fontSize: 12, fontFamily: fonts.mono, marginTop: 3, textAlign: 'right' },
     bubbleTimeMine: { color: colors.onAccent, opacity: 0.7 },
     composerRow: {
       flexDirection: 'row',
@@ -252,7 +252,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 18,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
@@ -260,6 +260,6 @@ function createStyles(colors: ThemeColors) {
     },
     sendButton: { backgroundColor: colors.accent, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 10 },
     sendButtonDisabled: { opacity: 0.5 },
-    sendButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    sendButtonText: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.bodySemiBold },
   });
 }

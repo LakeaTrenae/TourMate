@@ -86,9 +86,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack },
-    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
-    description: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginTop: 12, marginBottom: 20, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack },
+    subtitle: { color: colors.textDim, fontSize: 16, marginTop: 4, fontFamily: fonts.body },
+    description: { color: colors.textDim, fontSize: 17, lineHeight: 20, marginTop: 12, marginBottom: 20, fontFamily: fonts.body },
     card: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -101,8 +101,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     cardMain: { flex: 1, paddingRight: 12 },
-    cardTitle: { color: colors.text, fontSize: 16, fontFamily: fonts.displaySemiBold, marginBottom: 4 },
-    cardDescription: { color: colors.textDim, fontSize: 13, lineHeight: 18, fontFamily: fonts.body },
-    cardArrow: { color: colors.accent, fontSize: 22, fontFamily: fonts.body },
+    cardTitle: { color: colors.text, fontSize: 19, fontFamily: fonts.displaySemiBold, marginBottom: 4 },
+    cardDescription: { color: colors.textDim, fontSize: 16, lineHeight: 18, fontFamily: fonts.body },
+    cardArrow: { color: colors.accent, fontSize: 26, fontFamily: fonts.body },
   });
 }

@@ -153,10 +153,10 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 60, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
-    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
+    error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', lineHeight: 20, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', lineHeight: 20, fontFamily: fonts.body },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -166,9 +166,9 @@ function createStyles(colors: ThemeColors) {
       marginBottom: 8,
     },
     rowMain: { flex: 1 },
-    rowName: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold },
+    rowName: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold },
     rowNameUnread: { color: colors.accent },
-    rowPreview: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
+    rowPreview: { color: colors.textDim, fontSize: 16, marginTop: 2, fontFamily: fonts.body },
     unreadDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.spark, marginLeft: 10 },
   });
 }

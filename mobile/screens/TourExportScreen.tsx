@@ -380,9 +380,9 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
-    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, marginBottom: 20, fontFamily: fonts.body },
-    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
+    subtitle: { color: colors.textDim, fontSize: 16, marginTop: 2, marginBottom: 20, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     card: {
       backgroundColor: colors.surface,
       borderRadius: 14,
@@ -391,9 +391,9 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    cardTitle: { color: colors.text, fontSize: 16, fontFamily: fonts.displaySemiBold, marginBottom: 6 },
-    cardDescription: { color: colors.textDim, fontSize: 13, lineHeight: 18, marginBottom: 14, fontFamily: fonts.body },
+    cardTitle: { color: colors.text, fontSize: 19, fontFamily: fonts.displaySemiBold, marginBottom: 6 },
+    cardDescription: { color: colors.textDim, fontSize: 16, lineHeight: 18, marginBottom: 14, fontFamily: fonts.body },
     exportButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-    exportButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    exportButtonText: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.bodySemiBold },
   });
 }

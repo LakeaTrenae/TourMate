@@ -133,8 +133,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 24 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.6 },
-    subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 28, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.6 },
+    subtitle: { color: colors.textDim, fontSize: 17, textAlign: 'center', marginTop: 6, marginBottom: 28, fontFamily: fonts.body },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -142,16 +142,16 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 12,
-      fontSize: 20,
+      fontSize: 24,
       fontFamily: fonts.mono,
       textAlign: 'center',
       letterSpacing: 6,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    error: { color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center', fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, marginBottom: 12, textAlign: 'center', fontFamily: fonts.body },
     submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
-    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
-    cancelText: { color: colors.textFaint, fontSize: 13, textAlign: 'center', fontFamily: fonts.body },
+    submitButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
+    cancelText: { color: colors.textFaint, fontSize: 16, textAlign: 'center', fontFamily: fonts.body },
   });
 }

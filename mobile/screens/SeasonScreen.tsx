@@ -149,14 +149,14 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
-    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
+    error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-    emptyText: { color: colors.textFaint, fontSize: 14, textAlign: 'center', fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', fontFamily: fonts.body },
     yearGroup: { marginBottom: 20 },
-    yearLabel: { color: colors.text, fontSize: 20, fontFamily: fonts.displayBold, marginBottom: 10 },
+    yearLabel: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBold, marginBottom: 10 },
     orgGroup: { marginBottom: 10 },
-    orgLabel: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+    orgLabel: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: 12,
@@ -169,10 +169,10 @@ function createStyles(colors: ThemeColors) {
       elevation: 2,
     },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    tourName: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold },
+    tourName: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold },
     completedBadge: {
       color: colors.textFaint,
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: fonts.bodySemiBold,
       textTransform: 'uppercase',
       backgroundColor: colors.surface2,
@@ -180,6 +180,6 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 3,
       borderRadius: 6,
     },
-    tourDates: { color: colors.textFaint, fontSize: 12, marginTop: 4, fontFamily: fonts.mono },
+    tourDates: { color: colors.textFaint, fontSize: 15, marginTop: 4, fontFamily: fonts.mono },
   });
 }

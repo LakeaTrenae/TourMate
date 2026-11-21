@@ -218,8 +218,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
-    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack, marginBottom: 16 },
+    sectionTitle: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -227,7 +227,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 10,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
@@ -237,7 +237,7 @@ function createStyles(colors: ThemeColors) {
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
     chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
     chipActive: { backgroundColor: colors.accent },
-    chipText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipText: { color: colors.textDim, fontSize: 16, fontFamily: fonts.bodySemiBold },
     chipTextActive: { color: colors.onAccent },
     newVenueChip: {
       backgroundColor: colors.surface,
@@ -247,8 +247,8 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    newVenueChipText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
-    error: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4, fontFamily: fonts.body },
+    newVenueChipText: { color: colors.accent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 16, marginTop: 8, marginBottom: 4, fontFamily: fonts.body },
     submitButton: {
       backgroundColor: colors.accent,
       borderRadius: 10,
@@ -256,6 +256,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       marginTop: 16,
     },
-    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    submitButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
   });
 }

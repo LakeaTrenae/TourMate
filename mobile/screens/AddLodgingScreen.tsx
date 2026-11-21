@@ -234,7 +234,7 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.text,
-      fontSize: 22,
+      fontSize: 26,
       fontFamily: fonts.displayBold,
       marginBottom: 16,
     },
@@ -245,7 +245,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 10,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
@@ -259,7 +259,7 @@ function createStyles(colors: ThemeColors) {
     },
     sectionTitle: {
       color: colors.text,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.bodySemiBold,
       marginTop: 12,
       marginBottom: 8,
@@ -284,7 +284,7 @@ function createStyles(colors: ThemeColors) {
     },
     removeButtonText: {
       color: colors.danger,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.body,
     },
     rosterRow: {
@@ -304,12 +304,12 @@ function createStyles(colors: ThemeColors) {
     },
     rosterName: {
       color: colors.text,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.body,
     },
     rosterCheck: {
       color: colors.accent,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodyBold,
     },
     addRoomButton: {
@@ -319,12 +319,12 @@ function createStyles(colors: ThemeColors) {
     },
     addRoomButtonText: {
       color: colors.textDim,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.body,
     },
     error: {
       color: colors.danger,
-      fontSize: 13,
+      fontSize: 16,
       marginTop: 8,
       marginBottom: 4,
       fontFamily: fonts.body,
@@ -338,7 +338,7 @@ function createStyles(colors: ThemeColors) {
     },
     submitButtonText: {
       color: colors.onAccent,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.bodySemiBold,
     },
   });

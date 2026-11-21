@@ -23,7 +23,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     stamp: {
       fontFamily: fonts.bodyBold,
-      fontSize: 10,
+      fontSize: 12,
       letterSpacing: 0.5,
       textTransform: 'uppercase',
       paddingHorizontal: 9,

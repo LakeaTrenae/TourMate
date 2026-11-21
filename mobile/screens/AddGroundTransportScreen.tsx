@@ -175,7 +175,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack, marginBottom: 16 },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -183,15 +183,15 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 10,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
     },
     row: { flexDirection: 'row', gap: 10 },
     rowInput: { flex: 1 },
-    sectionTitle: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemiBold, marginTop: 12, marginBottom: 8 },
-    emptyText: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.body },
+    sectionTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.bodySemiBold, marginTop: 12, marginBottom: 8 },
+    emptyText: { color: colors.textFaint, fontSize: 16, fontFamily: fonts.body },
     rosterRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -204,10 +204,10 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     rosterRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-    rosterName: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
-    rosterCheck: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
-    error: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4, fontFamily: fonts.body },
+    rosterName: { color: colors.text, fontSize: 17, fontFamily: fonts.body },
+    rosterCheck: { color: colors.accent, fontSize: 17, fontFamily: fonts.bodyBold },
+    error: { color: colors.danger, fontSize: 16, marginTop: 8, marginBottom: 4, fontFamily: fonts.body },
     submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    submitButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
   });
 }

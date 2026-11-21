@@ -103,9 +103,9 @@ function createStyles(colors: ThemeColors) {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    title: { color: colors.text, fontSize: 15, fontFamily: fonts.displaySemiBold, flex: 1, marginRight: 12 },
-    externalLink: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
-    error: { color: colors.danger, fontSize: 14, textAlign: 'center', paddingHorizontal: 24, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold, flex: 1, marginRight: 12 },
+    externalLink: { color: colors.accent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    error: { color: colors.danger, fontSize: 17, textAlign: 'center', paddingHorizontal: 24, fontFamily: fonts.body },
     webview: { flex: 1, backgroundColor: colors.bg },
   });
 }

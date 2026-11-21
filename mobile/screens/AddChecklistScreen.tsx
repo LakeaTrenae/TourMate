@@ -316,9 +316,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
-    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
-    templateHint: { color: colors.textFaint, fontSize: 12, marginTop: -4, marginBottom: 4, fontFamily: fonts.body },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack, marginBottom: 16 },
+    sectionTitle: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 },
+    templateHint: { color: colors.textFaint, fontSize: 15, marginTop: -4, marginBottom: 4, fontFamily: fonts.body },
     templateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     templateChip: {
       backgroundColor: colors.surface,
@@ -328,7 +328,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 10,
     },
-    templateChipText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    templateChipText: { color: colors.accent, fontSize: 16, fontFamily: fonts.bodySemiBold },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -336,7 +336,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginTop: 4,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
@@ -344,7 +344,7 @@ function createStyles(colors: ThemeColors) {
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: { backgroundColor: colors.surface2, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
     chipActive: { backgroundColor: colors.accent },
-    chipText: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold },
+    chipText: { color: colors.textDim, fontSize: 16, fontFamily: fonts.bodySemiBold },
     chipTextActive: { color: colors.onAccent },
     visibilityRow: {
       flexDirection: 'row',
@@ -358,10 +358,10 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     visibilityRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-    visibilityText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
-    check: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
+    visibilityText: { color: colors.text, fontSize: 17, fontFamily: fonts.body },
+    check: { color: colors.accent, fontSize: 17, fontFamily: fonts.bodyBold },
     shareBox: { backgroundColor: colors.surface2, borderRadius: 10, padding: 14, marginBottom: 6 },
-    shareBoxLabel: { color: colors.textDim, fontSize: 11, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    shareBoxLabel: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
     shareBoxLabelSpaced: { marginTop: 14 },
     checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
     checkbox: {
@@ -375,10 +375,10 @@ function createStyles(colors: ThemeColors) {
       marginRight: 10,
     },
     checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
-    checkmark: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bodyBold },
-    checkboxLabel: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
-    error: { color: colors.danger, fontSize: 13, marginTop: 12, fontFamily: fonts.body },
+    checkmark: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bodyBold },
+    checkboxLabel: { color: colors.text, fontSize: 17, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, marginTop: 12, fontFamily: fonts.body },
     submitButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    submitButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
   });
 }

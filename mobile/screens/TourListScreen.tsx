@@ -424,7 +424,7 @@ function createStyles(colors: ThemeColors) {
     },
     headerTitle: {
       color: colors.text,
-      fontSize: 32,
+      fontSize: 38,
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.7,
     },
@@ -435,12 +435,12 @@ function createStyles(colors: ThemeColors) {
     },
     createButton: {
       color: colors.accent,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodySemiBold,
     },
     headerLink: {
       color: colors.textDim,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodyMedium,
     },
     searchInput: {
@@ -449,7 +449,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.body,
       marginBottom: 12,
       borderWidth: 1,
@@ -471,7 +471,7 @@ function createStyles(colors: ThemeColors) {
     },
     filterChipText: {
       color: colors.textDim,
-      fontSize: 12,
+      fontSize: 15,
       fontFamily: fonts.bodySemiBold,
     },
     filterChipTextActive: {
@@ -479,13 +479,13 @@ function createStyles(colors: ThemeColors) {
     },
     error: {
       color: colors.danger,
-      fontSize: 13,
+      fontSize: 16,
       marginBottom: 12,
       fontFamily: fonts.body,
     },
     offlineBanner: {
       color: colors.warn,
-      fontSize: 12,
+      fontSize: 15,
       marginBottom: 12,
       textAlign: 'center',
       fontFamily: fonts.body,
@@ -504,13 +504,13 @@ function createStyles(colors: ThemeColors) {
     },
     lockedOrgText: {
       color: colors.warn,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodySemiBold,
       flex: 1,
     },
     lockedOrgArrow: {
       color: colors.warn,
-      fontSize: 18,
+      fontSize: 22,
     },
     emptyContainer: {
       flexGrow: 1,
@@ -518,14 +518,14 @@ function createStyles(colors: ThemeColors) {
     },
     emptyText: {
       color: colors.textFaint,
-      fontSize: 14,
+      fontSize: 17,
       textAlign: 'center',
       paddingHorizontal: 20,
       fontFamily: fonts.body,
     },
     sectionHeader: {
       color: colors.textDim,
-      fontSize: 11,
+      fontSize: 14,
       fontFamily: fonts.bodySemiBold,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
@@ -545,20 +545,20 @@ function createStyles(colors: ThemeColors) {
     },
     eyebrow: {
       color: colors.textDim,
-      fontSize: 9,
+      fontSize: 11,
       fontFamily: fonts.mono,
       letterSpacing: 0.4,
     },
     tourName: {
       color: colors.text,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.displaySemiBold,
       marginBottom: 6,
       lineHeight: 19,
     },
     tourDates: {
       color: colors.textDim,
-      fontSize: 11,
+      fontSize: 14,
       fontFamily: fonts.mono,
     },
     coverImage: {
@@ -576,14 +576,14 @@ function createStyles(colors: ThemeColors) {
     },
     coverTourName: {
       color: '#ffffff',
-      fontSize: 19,
+      fontSize: 23,
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.3,
       lineHeight: 21,
     },
     coverTourDates: {
       color: 'rgba(255,255,255,0.85)',
-      fontSize: 11,
+      fontSize: 14,
       fontFamily: fonts.mono,
       marginTop: 3,
     },

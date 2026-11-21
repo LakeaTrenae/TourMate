@@ -163,11 +163,11 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack },
-    subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
-    error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
-    emptyText: { color: colors.textFaint, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
-    sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 8 },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack },
+    subtitle: { color: colors.textDim, fontSize: 16, marginTop: 4, marginBottom: 16, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
+    emptyText: { color: colors.textFaint, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
+    sectionTitle: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 8 },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -175,7 +175,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 10,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
@@ -184,6 +184,6 @@ function createStyles(colors: ThemeColors) {
     rowInput: { flex: 1 },
     notesInput: { minHeight: 80, textAlignVertical: 'top' },
     saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-    saveButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    saveButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
   });
 }

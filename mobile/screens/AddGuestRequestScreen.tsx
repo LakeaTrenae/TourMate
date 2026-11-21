@@ -137,8 +137,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
-    sectionTitle: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold, marginBottom: 8 },
+    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack, marginBottom: 16 },
+    sectionTitle: { color: colors.text, fontSize: 17, fontFamily: fonts.bodySemiBold, marginBottom: 8 },
     dateRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -151,8 +151,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     dateRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-    dateRowText: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
-    check: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodyBold },
+    dateRowText: { color: colors.text, fontSize: 17, fontFamily: fonts.body },
+    check: { color: colors.accent, fontSize: 17, fontFamily: fonts.bodyBold },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,
@@ -160,12 +160,12 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginTop: 12,
-      fontSize: 15,
+      fontSize: 18,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    error: { color: colors.danger, fontSize: 13, marginTop: 8, fontFamily: fonts.body },
+    error: { color: colors.danger, fontSize: 16, marginTop: 8, fontFamily: fonts.body },
     submitButton: {
       backgroundColor: colors.accent,
       borderRadius: 10,
@@ -173,6 +173,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       marginTop: 16,
     },
-    submitButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },
+    submitButtonText: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.bodySemiBold },
   });
 }

@@ -517,7 +517,7 @@ function createStyles(colors: ThemeColors) {
     },
     tourName: {
       color: colors.text,
-      fontSize: 30,
+      fontSize: 36,
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.6,
       flexShrink: 1,
@@ -529,12 +529,12 @@ function createStyles(colors: ThemeColors) {
     },
     settingsLink: {
       color: colors.textDim,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodyMedium,
     },
     roleBadge: {
       color: colors.textDim,
-      fontSize: 13,
+      fontSize: 16,
       marginTop: 4,
       marginBottom: 20,
       fontFamily: fonts.body,
@@ -558,38 +558,38 @@ function createStyles(colors: ThemeColors) {
     },
     roadCardEyebrow: {
       color: 'rgba(255,255,255,0.85)',
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: fonts.bodySemiBold,
       letterSpacing: 1,
     },
     roadCardCity: {
       color: '#ffffff',
-      fontSize: 24,
+      fontSize: 29,
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.4,
       marginTop: 2,
     },
     roadCardDetail: {
       color: 'rgba(255,255,255,0.9)',
-      fontSize: 12,
+      fontSize: 15,
       fontFamily: fonts.mono,
       marginTop: 3,
     },
     roadCardCredit: {
       color: 'rgba(255,255,255,0.6)',
-      fontSize: 9,
+      fontSize: 11,
       fontFamily: fonts.body,
       marginTop: 6,
     },
     error: {
       color: colors.danger,
-      fontSize: 13,
+      fontSize: 16,
       marginBottom: 12,
       fontFamily: fonts.body,
     },
     offlineBanner: {
       color: colors.warn,
-      fontSize: 12,
+      fontSize: 15,
       marginBottom: 12,
       textAlign: 'center',
       fontFamily: fonts.body,
@@ -602,13 +602,13 @@ function createStyles(colors: ThemeColors) {
     },
     lockBannerText: {
       color: colors.warn,
-      fontSize: 13,
+      fontSize: 16,
       lineHeight: 18,
       fontFamily: fonts.body,
     },
     emptyText: {
       color: colors.textFaint,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.body,
     },
     section: {
@@ -622,7 +622,7 @@ function createStyles(colors: ThemeColors) {
     },
     sectionTitle: {
       color: colors.text,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.displaySemiBold,
     },
     sectionActionRow: {
@@ -631,7 +631,7 @@ function createStyles(colors: ThemeColors) {
     },
     sectionAction: {
       color: colors.accent,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.bodySemiBold,
     },
     dayGroup: {
@@ -639,7 +639,7 @@ function createStyles(colors: ThemeColors) {
     },
     dayLabel: {
       color: colors.textDim,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.bodySemiBold,
       marginBottom: 6,
     },
@@ -652,7 +652,7 @@ function createStyles(colors: ThemeColors) {
     },
     scheduleTime: {
       color: colors.text,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.monoMedium,
       width: 52,
     },
@@ -661,12 +661,12 @@ function createStyles(colors: ThemeColors) {
     },
     scheduleTitle: {
       color: colors.text,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.body,
     },
     scheduleMeta: {
       color: colors.textFaint,
-      fontSize: 12,
+      fontSize: 15,
       marginTop: 2,
       fontFamily: fonts.body,
     },
@@ -678,24 +678,24 @@ function createStyles(colors: ThemeColors) {
     },
     personName: {
       color: colors.text,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.bodySemiBold,
     },
     personMeta: {
       color: colors.textDim,
-      fontSize: 12,
+      fontSize: 15,
       marginTop: 2,
       fontFamily: fonts.body,
     },
     personContactLink: {
       color: colors.accent,
-      fontSize: 12,
+      fontSize: 15,
       marginTop: 2,
       fontFamily: fonts.body,
     },
     seeAllText: {
       color: colors.accent,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.bodySemiBold,
       marginTop: 6,
     },
@@ -709,12 +709,12 @@ function createStyles(colors: ThemeColors) {
     },
     stubLabel: {
       color: colors.text,
-      fontSize: 14,
+      fontSize: 17,
       fontFamily: fonts.body,
     },
     navArrow: {
       color: colors.textFaint,
-      fontSize: 18,
+      fontSize: 22,
     },
   });
 }

@@ -112,14 +112,14 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.text,
-      fontSize: 28,
+      fontSize: 33,
       fontFamily: fonts.displayBlack,
       textAlign: 'center',
       letterSpacing: -0.4,
     },
     subtitle: {
       color: colors.textDim,
-      fontSize: 14,
+      fontSize: 17,
       textAlign: 'center',
       marginTop: 10,
       marginBottom: 28,
@@ -133,14 +133,14 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 14,
       paddingVertical: 12,
       marginBottom: 12,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.body,
       borderWidth: 1,
       borderColor: colors.border,
     },
     error: {
       color: colors.danger,
-      fontSize: 13,
+      fontSize: 16,
       marginBottom: 12,
       fontFamily: fonts.body,
     },
@@ -154,12 +154,12 @@ function createStyles(colors: ThemeColors) {
     },
     submitButtonText: {
       color: colors.onAccent,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.bodySemiBold,
     },
     skipText: {
       color: colors.textDim,
-      fontSize: 13,
+      fontSize: 16,
       textAlign: 'center',
       fontFamily: fonts.body,
     },
@@ -169,7 +169,7 @@ function createStyles(colors: ThemeColors) {
     },
     signOut: {
       color: colors.textFaint,
-      fontSize: 13,
+      fontSize: 16,
       fontFamily: fonts.body,
     },
   });
