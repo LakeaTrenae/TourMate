@@ -14,10 +14,11 @@
  * `tour_members` for a given tour, that row never comes back over the
  * wire at all, regardless of what this screen's code does with it.
  *
- * Grid layout + theme (Fraunces/Manrope/JetBrains Mono, navy accent) per
- * the "Load-In" design review — see lib/theme.tsx. SectionList has no
- * numColumns option (that's FlatList-only), so each section's tours are
- * pre-chunked into pairs and rendered as rows of up to two cards.
+ * Cards render as TicketCard (dashed-perforation ticket-stub shape) with a
+ * StampBadge for status, per the "Marquee" design system — see lib/theme.tsx
+ * and components/. SectionList has no numColumns option (that's
+ * FlatList-only), so each section's tours are pre-chunked into pairs and
+ * rendered as rows of up to two cards.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -39,6 +40,8 @@ import { useAuth } from '../lib/auth-context';
 import { formatDateOnly, parseDateOnly } from '../lib/dates';
 import { useCachedLoad } from '../lib/useCachedLoad';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
+import { TicketCard } from '../components/TicketCard';
+import { StampBadge } from '../components/StampBadge';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TourList'>;
@@ -245,23 +248,22 @@ export function TourListScreen({ navigation }: Props) {
   function renderTourCard(item: TourRow, status: DateStatus) {
     const isActive = status === 'in_progress';
     const isUpcoming = status === 'upcoming';
-    const statusColor = isActive || isUpcoming ? colors.accent : colors.textFaint;
+    const tone = isActive ? 'signature' : isUpcoming ? 'spark' : 'neutral';
     const statusLabel = isActive ? 'Active' : isUpcoming ? 'Upcoming' : 'Completed';
 
     return (
-      <Pressable
+      <TicketCard
         key={item.id}
-        style={[styles.tourCard, isActive && styles.tourCardActive]}
+        style={styles.tourCard}
         onPress={() => navigation.navigate('TourDashboard', { tourId: item.id, tourName: item.name })}
+        stubLeft={
+          item.organization ? <Text style={styles.eyebrow}>{item.organization.name.toUpperCase()}</Text> : undefined
+        }
+        stubRight={<StampBadge label={statusLabel} tone={tone} />}
       >
-        <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-        </View>
-        {item.organization && <Text style={styles.eyebrow}>{item.organization.name.toUpperCase()}</Text>}
         <Text style={styles.tourName}>{item.name}</Text>
         <Text style={styles.tourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
-      </Pressable>
+      </TicketCard>
     );
   }
 
@@ -486,43 +488,12 @@ function createStyles(colors: ThemeColors) {
     },
     tourCard: {
       flex: 1,
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      elevation: 2,
-    },
-    tourCardActive: {
-      borderTopWidth: 2,
-      borderTopColor: colors.accent,
-      paddingTop: 12,
-    },
-    statusRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      marginBottom: 8,
-    },
-    statusDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 3,
-    },
-    statusText: {
-      fontSize: 9,
-      fontFamily: fonts.bodySemiBold,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
     },
     eyebrow: {
       color: colors.textDim,
       fontSize: 9,
       fontFamily: fonts.mono,
       letterSpacing: 0.4,
-      marginBottom: 6,
     },
     tourName: {
       color: colors.text,

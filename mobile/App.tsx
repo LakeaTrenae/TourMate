@@ -16,6 +16,11 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
+import {
+  BigShouldersDisplay_600SemiBold,
+  BigShouldersDisplay_700Bold,
+  BigShouldersDisplay_900Black,
+} from '@expo-google-fonts/big-shoulders-display';
 
 import { AuthProvider, useAuth } from './lib/auth-context';
 import { ThemeProvider } from './lib/theme';
@@ -180,7 +185,7 @@ function RootNavigator() {
 }
 
 export default function App() {
-  // The Load-In design system's three families — see lib/theme.tsx for
+  // The "Marquee" design system's three families — see lib/theme.tsx for
   // where these get mapped to semantic names (fonts.displayBold, etc.).
   // Blocking on this (rather than falling back to system fonts while
   // loading) avoids a flash of the wrong typeface on every cold start,
@@ -193,6 +198,9 @@ export default function App() {
     Manrope_800ExtraBold,
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
+    BigShouldersDisplay_600SemiBold,
+    BigShouldersDisplay_700Bold,
+    BigShouldersDisplay_900Black,
   });
 
   if (!fontsLoaded) {

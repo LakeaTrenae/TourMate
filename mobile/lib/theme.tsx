@@ -1,11 +1,18 @@
 /**
- * theme.tsx — the Fraunces / Manrope / JetBrains Mono + navy design
- * system approved via the "Load-In" design review (list-heavy screens:
- * TourList, Venues, Artists, Documents, Checklists, GuestList). One
- * ThemeProvider wraps the app (App.tsx) and every converted screen reads
- * colors/fonts from useTheme() instead of hardcoding hex values — a
- * future palette or type change becomes a one-file edit, not a
- * grep-and-replace across a dozen StyleSheets.
+ * theme.tsx — the "Marquee" design system (Big Shoulders Display /
+ * Manrope / JetBrains Mono, warm-paper neutrals, amber + spark accents),
+ * grounded in the touring world itself: stage-lighting gels, laminate
+ * color-coding, and routing-sheet paper instead of a cold white/navy
+ * SaaS look. Replaces the earlier navy "Load-In" system approved
+ * earlier in this project — same centralized-token approach, just new
+ * values, confirmed with the user via a design-concept artifact first.
+ *
+ * One ThemeProvider wraps the app (App.tsx) and every converted screen
+ * reads colors/fonts from useTheme() instead of hardcoding hex values —
+ * a future palette or type change becomes a one-file edit, not a
+ * grep-and-replace across a dozen StyleSheets. This is exactly why the
+ * navy -> amber swap below needed zero changes to the 46 already-converted
+ * screens themselves.
  *
  * Screens not yet converted to this system keep their existing hardcoded
  * dark styling untouched — this is additive infrastructure, not a
@@ -23,16 +30,17 @@ const STORAGE_KEY = 'themePreference';
 // Weight names come straight from @expo-google-fonts' export names — see
 // the useFonts() call in App.tsx for where these are actually loaded.
 //
-// One family (Manrope) carries both display and body now — Fraunces read
-// heavy/clunky at real UI sizes once it was actually on screen rather
-// than in a polished static mockup, so it's out. Every screen reads
-// these semantic names, never a literal font string, so a future swap
-// is this one file, not six.
+// Display now carries real character (Big Shoulders Display — tall,
+// condensed, stenciled tour-signage energy) while body/data stay put:
+// Manrope and JetBrains Mono were already proven and aren't what the
+// "where's the personality" feedback was about. Every screen reads these
+// semantic names, never a literal font string, so this swap — like the
+// earlier Fraunces -> Manrope one — is this one file, not forty-six.
 export const fonts = {
-  displayBlack: 'Manrope_800ExtraBold', // page-level titles
-  displayBold: 'Manrope_700Bold', // section/emphasis headers
-  displaySemiBold: 'Manrope_600SemiBold', // card titles
-  displayItalic: 'Manrope_600SemiBold', // no italic cut in this family — falls back to upright
+  displayBlack: 'BigShouldersDisplay_900Black', // page-level titles
+  displayBold: 'BigShouldersDisplay_700Bold', // section/emphasis headers
+  displaySemiBold: 'BigShouldersDisplay_600SemiBold', // card titles
+  displayItalic: 'BigShouldersDisplay_600SemiBold', // no italic cut in this family — falls back to upright
   body: 'Manrope_400Regular',
   bodyMedium: 'Manrope_500Medium',
   bodySemiBold: 'Manrope_600SemiBold',
@@ -41,44 +49,59 @@ export const fonts = {
   monoMedium: 'JetBrainsMono_500Medium',
 };
 
+// "Marquee" palette — grounded in stage-lighting/touring vocabulary, not
+// generic SaaS blue. Two decorative colors only: `accent` (amber, the
+// "house light" — primary actions/brand) and `spark` (ticket-stub red —
+// small playful moments: a hot link, a stamped status, a pending badge).
+// `success`/`danger` stay reserved for literal money (income/expense) —
+// never spent decoratively — per the explicit "not too many colors"
+// direction. `accent2` is kept (duplicating `spark`'s value) solely for
+// the one pre-existing VenuesScreen usage; reach for `spark`/`sparkSoft`
+// directly in anything new.
 const lightColors = {
-  bg: '#f6f7f9',
+  bg: '#fbf6ee', // routing-sheet paper, not pure white
   surface: '#ffffff',
-  surface2: '#eceef2',
-  text: '#141821',
-  textDim: '#666c78',
-  textFaint: '#9aa0aa',
-  accent: '#1c3a5e',
-  accent2: '#2f5686',
-  accentSoft: 'rgba(28,58,94,0.08)',
-  onAccent: '#ffffff', // readable text/icon color when painted on top of `accent`
-  warn: '#a86a1e',
-  warnSoft: 'rgba(168,106,30,0.12)',
-  success: '#1f8a5f',
-  successSoft: 'rgba(31,138,95,0.1)',
-  danger: '#b3261e',
-  dangerSoft: 'rgba(179,38,30,0.1)',
-  border: '#e3e5ea',
+  surface2: '#f3ece0',
+  text: '#1b1710',
+  textDim: '#6b6252',
+  textFaint: '#9b9280',
+  accent: '#e89418', // marquee amber — "house light"
+  accent2: '#ef5536', // = spark (back-compat alias, see note above)
+  accentSoft: 'rgba(232,148,24,0.14)',
+  onAccent: '#231300', // readable text/icon color when painted on top of `accent`
+  spark: '#ef5536', // ticket-stub red-orange
+  sparkSoft: 'rgba(239,85,54,0.12)',
+  sparkInk: '#2b0a04',
+  warn: '#e89418', // reuses signature amber — the crew-access/trial banners ARE the house light
+  warnSoft: 'rgba(232,148,24,0.14)',
+  success: '#19875a', // money-positive — reserved for literal currency figures
+  successSoft: 'rgba(25,135,90,0.10)',
+  danger: '#c23b2e', // money-negative — reserved for literal currency figures
+  dangerSoft: 'rgba(194,59,46,0.10)',
+  border: '#e4d9c6',
 };
 
 const darkColors = {
-  bg: '#0b0e13',
-  surface: '#151920',
-  surface2: '#1a1f28',
-  text: '#f0f2f5',
-  textDim: '#8d94a0',
-  textFaint: '#5f6570',
-  accent: '#5b93cf',
-  accent2: '#3a6a9e',
-  accentSoft: 'rgba(91,147,207,0.16)',
-  onAccent: '#0b0e13', // dark-mode accent is light enough that dark text/icons read better than white
-  warn: '#e0a545',
-  warnSoft: 'rgba(224,165,69,0.15)',
-  success: '#4fd192',
-  successSoft: 'rgba(79,209,146,0.14)',
-  danger: '#ff6b6b',
-  dangerSoft: 'rgba(255,107,107,0.12)',
-  border: '#242932',
+  bg: '#121016',
+  surface: '#1b1820',
+  surface2: '#242029',
+  text: '#f3efe8',
+  textDim: '#b2a99c',
+  textFaint: '#756c60',
+  accent: '#f6a723',
+  accent2: '#ff6b4d', // = spark (back-compat alias, see note above)
+  accentSoft: 'rgba(246,167,35,0.18)',
+  onAccent: '#1a0f00', // dark-mode accent is light enough that dark text/icons read better than white
+  spark: '#ff6b4d',
+  sparkSoft: 'rgba(255,107,77,0.16)',
+  sparkInk: '#200603',
+  warn: '#f6a723',
+  warnSoft: 'rgba(246,167,35,0.18)',
+  success: '#3fcf98',
+  successSoft: 'rgba(63,207,152,0.14)',
+  danger: '#ec6a5a',
+  dangerSoft: 'rgba(236,106,90,0.14)',
+  border: '#332d3a',
 };
 
 export type ThemeColors = typeof lightColors;
