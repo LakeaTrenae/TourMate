@@ -199,7 +199,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     header: { marginBottom: 16 },
-    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
+    title: { color: colors.text, fontSize: 54, fontFamily: fonts.displayBlack, letterSpacing: -1.2 },
     subtitle: { color: colors.textDim, fontSize: 16, marginTop: 2, fontFamily: fonts.body },
     addRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
     addInput: {

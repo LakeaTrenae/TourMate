@@ -417,16 +417,14 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 18,
+      marginBottom: 14,
     },
     headerTitle: {
       color: colors.text,
-      fontSize: 38,
+      fontSize: 60,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.7,
+      letterSpacing: -1.5,
+      marginBottom: 6,
     },
     headerActions: {
       flexDirection: 'row',

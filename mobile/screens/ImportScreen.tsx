@@ -86,7 +86,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack },
     subtitle: { color: colors.textDim, fontSize: 16, marginTop: 4, fontFamily: fonts.body },
     description: { color: colors.textDim, fontSize: 17, lineHeight: 20, marginTop: 12, marginBottom: 20, fontFamily: fonts.body },
     card: {

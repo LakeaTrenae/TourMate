@@ -250,7 +250,7 @@ function createStyles(colors: ThemeColors) {
     },
     wordmark: {
       color: colors.text,
-      fontSize: 49,
+      fontSize: 68,
       fontFamily: fonts.displayBlack,
       textAlign: 'center',
       letterSpacing: 4,

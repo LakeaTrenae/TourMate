@@ -395,7 +395,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 29, fontFamily: fonts.displayBlack, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, marginBottom: 16 },
     input: {
       backgroundColor: colors.surface,
       color: colors.text,

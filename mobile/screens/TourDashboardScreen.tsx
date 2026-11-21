@@ -511,21 +511,19 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 40,
     },
     titleRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      marginBottom: 4,
     },
     tourName: {
       color: colors.text,
-      fontSize: 36,
+      fontSize: 58,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.6,
-      flexShrink: 1,
+      letterSpacing: -1.4,
     },
     titleActions: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 14,
+      marginTop: 4,
     },
     settingsLink: {
       color: colors.textDim,

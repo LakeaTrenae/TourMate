@@ -153,7 +153,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 60, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 54, fontFamily: fonts.displayBlack, letterSpacing: -1.2, marginBottom: 16 },
     error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },
     emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', lineHeight: 20, fontFamily: fonts.body },

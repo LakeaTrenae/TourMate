@@ -215,7 +215,7 @@ function createStyles(colors: ThemeColors) {
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingTop: 20, paddingBottom: 60 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
+    title: { color: colors.text, fontSize: 54, fontFamily: fonts.displayBlack, letterSpacing: -1.2 },
     subtitle: { color: colors.textDim, fontSize: 16, marginTop: 2, fontFamily: fonts.body },
     addButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
     addButtonText: { color: colors.onAccent, fontSize: 16, fontFamily: fonts.bodySemiBold },

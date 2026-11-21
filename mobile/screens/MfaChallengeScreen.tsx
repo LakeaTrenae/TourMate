@@ -133,7 +133,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 24 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    title: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -0.6 },
+    title: { color: colors.text, fontSize: 54, fontFamily: fonts.displayBlack, textAlign: 'center', letterSpacing: -1.2 },
     subtitle: { color: colors.textDim, fontSize: 17, textAlign: 'center', marginTop: 6, marginBottom: 28, fontFamily: fonts.body },
     input: {
       backgroundColor: colors.surface,
