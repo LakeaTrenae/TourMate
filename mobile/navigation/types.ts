@@ -12,6 +12,7 @@ export type RootStackParamList = {
   TourList: undefined;
   TourDashboard: { tourId: string; tourName: string };
   TourSettings: { tourId: string; tourName: string };
+  Calendar: { tourId: string; tourName: string };
   Travel: { tourId: string; tourName: string };
   AddFlight: { tourId: string };
   Lodging: { tourId: string; tourName: string };

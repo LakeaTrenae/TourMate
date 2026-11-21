@@ -289,6 +289,9 @@ export function TourDashboardScreen({ route, navigation }: Props) {
         styles={styles}
         action={
           <View style={styles.sectionActionRow}>
+            <Pressable onPress={() => navigation.navigate('Calendar', { tourId, tourName })}>
+              <Text style={styles.sectionAction}>Calendar</Text>
+            </Pressable>
             <Pressable onPress={handleExportCalendar} disabled={exporting}>
               <Text style={styles.sectionAction}>{exporting ? 'Exporting…' : 'Export'}</Text>
             </Pressable>
