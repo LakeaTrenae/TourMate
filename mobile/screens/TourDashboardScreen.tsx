@@ -18,11 +18,12 @@
  * so they take the computed `styles` as a prop rather than closing over
  * a module-level StyleSheet the way the pre-theme version did.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  ImageBackground,
   Linking,
   Pressable,
   RefreshControl,
@@ -44,7 +45,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TourDashboard'>;
 
-type TourDate = { id: string; date: string };
+type TourDate = { id: string; date: string; venue?: { name: string; city: string | null; state: string | null } | null };
 type ScheduleItem = {
   id: string;
   tour_date_id: string;
@@ -62,12 +63,15 @@ type TourMemberRow = {
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
 
+type NextShow = { date: string; city: string; state: string | null; venueName: string | null };
+
 type DashboardData = {
   effectiveRole: string | null;
   department: string | null;
   completedAt: string | null;
   scheduleByDate: { id: string; date: string; items: ScheduleItem[] }[];
   members: TourMemberRow[];
+  nextShow: NextShow | null;
 };
 
 type Styles = ReturnType<typeof createStyles>;
@@ -114,14 +118,24 @@ export function TourDashboardScreen({ route, navigation }: Props) {
     // them. RLS (can_view_schedule_item) already filters items down to
     // "visible to all", "my department", "I'm a manager", or "explicitly
     // shared with me" — no filtering needed here.
-    const { data: dates, error: datesError } = await supabase
+    const { data: datesRaw, error: datesError } = await supabase
       .from('tour_dates')
-      .select('id, date')
+      .select('id, date, venue:venues(name, city, state)')
       .eq('tour_id', tourId)
       .order('date', { ascending: true });
     if (datesError) throw datesError;
+    const dates = (datesRaw ?? []) as unknown as TourDate[];
 
-    const dateIds = (dates ?? []).map((d: TourDate) => d.id);
+    // "On the road" card target: the next show today-or-later with a
+    // venue city on file. Falls back to null (card just doesn't render)
+    // once every date on the tour is in the past.
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const upcoming = dates.find((d: TourDate) => d.date >= todayKey && d.venue?.city);
+    const nextShow: NextShow | null = upcoming
+      ? { date: upcoming.date, city: upcoming.venue!.city!, state: upcoming.venue!.state, venueName: upcoming.venue!.name }
+      : null;
+
+    const dateIds = dates.map((d: TourDate) => d.id);
     let items: ScheduleItem[] = [];
     if (dateIds.length > 0) {
       const { data: itemRows, error: itemsError } = await supabase
@@ -145,12 +159,13 @@ export function TourDashboardScreen({ route, navigation }: Props) {
       effectiveRole: roleData ?? null,
       department: deptData ?? null,
       completedAt: tourRow?.completed_at ?? null,
-      scheduleByDate: (dates ?? []).map((d: TourDate) => ({
+      scheduleByDate: dates.map((d: TourDate) => ({
         id: d.id,
         date: d.date,
         items: items.filter((i) => i.tour_date_id === d.id),
       })),
       members: (memberRows ?? []) as unknown as TourMemberRow[],
+      nextShow,
     };
   }, [tourId, session]);
 
@@ -161,6 +176,22 @@ export function TourDashboardScreen({ route, navigation }: Props) {
   const completedAt = dashboard?.completedAt ?? null;
   const scheduleByDate = dashboard?.scheduleByDate ?? [];
   const members = dashboard?.members ?? [];
+  const nextShow = dashboard?.nextShow ?? null;
+
+  // Best-effort, separate from useCachedLoad on purpose — a missing
+  // PEXELS_API_KEY or a Pexels miss should never block or invalidate the
+  // cached dashboard data itself, just leave this one card unrendered.
+  const [cityPhoto, setCityPhoto] = useState<{ url: string; photographer: string | null } | null>(null);
+  useEffect(() => {
+    setCityPhoto(null);
+    if (!nextShow) return;
+    supabase.functions
+      .invoke('city-photo', { body: { city: nextShow.city, state: nextShow.state } })
+      .then(({ data }) => {
+        if (data?.photoUrl) setCityPhoto({ url: data.photoUrl, photographer: data.photographer ?? null });
+      })
+      .catch(() => {});
+  }, [nextShow?.city, nextShow?.state]);
 
   const isManager = useMemo(() => (effectiveRole ? MANAGER_TIERS.has(effectiveRole) : false), [effectiveRole]);
   const isTourOwner = effectiveRole === 'owner';
@@ -266,6 +297,22 @@ export function TourDashboardScreen({ route, navigation }: Props) {
         <Text style={styles.roleBadge}>
           {formatRole(effectiveRole)} · {formatDepartment(department)}
         </Text>
+      )}
+
+      {nextShow && cityPhoto && (
+        <ImageBackground source={{ uri: cityPhoto.url }} style={styles.roadCard} imageStyle={styles.roadCardImage}>
+          <View style={styles.roadCardScrim} />
+          <Text style={styles.roadCardEyebrow}>ON THE ROAD</Text>
+          <Text style={styles.roadCardCity}>
+            {nextShow.city}
+            {nextShow.state ? `, ${nextShow.state}` : ''}
+          </Text>
+          <Text style={styles.roadCardDetail}>
+            {nextShow.venueName ? `${nextShow.venueName} · ` : ''}
+            {formatDateOnly(nextShow.date, { month: 'short', day: 'numeric' })}
+          </Text>
+          {cityPhoto.photographer && <Text style={styles.roadCardCredit}>Photo by {cityPhoto.photographer} on Pexels</Text>}
+        </ImageBackground>
       )}
 
       {completedAt && (
@@ -469,6 +516,48 @@ function createStyles(colors: ThemeColors) {
       marginTop: 4,
       marginBottom: 20,
       fontFamily: fonts.body,
+    },
+    roadCard: {
+      height: 150,
+      borderRadius: 16,
+      padding: 14,
+      justifyContent: 'flex-end',
+      marginBottom: 16,
+      overflow: 'hidden',
+    },
+    roadCardImage: { borderRadius: 16 },
+    roadCardScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: '80%',
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    roadCardEyebrow: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: 10,
+      fontFamily: fonts.bodySemiBold,
+      letterSpacing: 1,
+    },
+    roadCardCity: {
+      color: '#ffffff',
+      fontSize: 24,
+      fontFamily: fonts.displayBlack,
+      letterSpacing: -0.4,
+      marginTop: 2,
+    },
+    roadCardDetail: {
+      color: 'rgba(255,255,255,0.9)',
+      fontSize: 12,
+      fontFamily: fonts.mono,
+      marginTop: 3,
+    },
+    roadCardCredit: {
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: 9,
+      fontFamily: fonts.body,
+      marginTop: 6,
     },
     error: {
       color: colors.danger,
