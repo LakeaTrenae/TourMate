@@ -13,6 +13,8 @@ export type RootStackParamList = {
   TourDashboard: { tourId: string; tourName: string };
   TourSettings: { tourId: string; tourName: string };
   Calendar: { tourId: string; tourName: string };
+  Messages: undefined;
+  ChatThread: { conversationId: string; title: string; isGroup: boolean; tourId: string };
   Travel: { tourId: string; tourName: string };
   AddFlight: { tourId: string };
   Lodging: { tourId: string; tourName: string };

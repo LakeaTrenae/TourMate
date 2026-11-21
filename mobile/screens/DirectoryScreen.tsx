@@ -105,6 +105,21 @@ export function DirectoryScreen({ route, navigation }: Props) {
     setRefreshing(false);
   }
 
+  // get_or_create_direct_conversation (0047_chat.sql) requires the two
+  // of you share at least one tour — always true from this screen, since
+  // both are on THIS tour's own roster, so the only realistic failure is
+  // a real network/RLS error worth surfacing.
+  async function handleMessage(otherUserId: string, otherName: string | undefined) {
+    setErrorMessage(null);
+    const { data, error } = await supabase.rpc('get_or_create_direct_conversation', { p_other_user_id: otherUserId });
+    if (error || !data || data.length === 0) {
+      setErrorMessage(error?.message ?? 'Failed to open this conversation.');
+      return;
+    }
+    const row = data[0] as { conversation_id: string; tour_id: string };
+    navigation.navigate('ChatThread', { conversationId: row.conversation_id, title: otherName ?? 'Message', isGroup: false, tourId: row.tour_id });
+  }
+
   const presentDepartments = useMemo(() => {
     const present = new Set(people.map((p) => p.department));
     return DEPARTMENT_ORDER.filter((d) => present.has(d));
@@ -200,6 +215,11 @@ export function DirectoryScreen({ route, navigation }: Props) {
                   {p.profile?.email && (
                     <Pressable onPress={() => Linking.openURL(`mailto:${p.profile!.email}`)}>
                       <Text style={styles.contactLink}>{p.profile.email}</Text>
+                    </Pressable>
+                  )}
+                  {session && p.user_id !== session.user.id && (
+                    <Pressable onPress={() => handleMessage(p.user_id, p.profile?.display_name)}>
+                      <Text style={styles.passportLink}>Message ›</Text>
                     </Pressable>
                   )}
                   {isManager && (

@@ -320,6 +320,9 @@ export function TourListScreen({ navigation }: Props) {
           <Pressable onPress={() => navigation.navigate('Season')}>
             <Text style={styles.headerLink}>Timeline</Text>
           </Pressable>
+          <Pressable onPress={() => navigation.navigate('Messages')}>
+            <Text style={styles.headerLink}>Messages</Text>
+          </Pressable>
           <Pressable onPress={handleCreateTour}>
             <Text style={styles.createButton}>+ Tour</Text>
           </Pressable>
@@ -414,7 +417,7 @@ function createStyles(colors: ThemeColors) {
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 16,
+      gap: 12,
     },
     createButton: {
       color: colors.accent,

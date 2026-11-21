@@ -214,6 +214,18 @@ export function TourDashboardScreen({ route, navigation }: Props) {
     setRefreshing(false);
   }
 
+  // get_or_create_tour_conversation (0047_chat.sql) is idempotent — any
+  // tour member lands in the same group thread whether they're the
+  // first person on the tour to ever open it or the fiftieth.
+  async function handleOpenChat() {
+    const { data, error } = await supabase.rpc('get_or_create_tour_conversation', { p_tour_id: tourId });
+    if (error || !data) {
+      setErrorMessage(error?.message ?? 'Failed to open the group chat.');
+      return;
+    }
+    navigation.navigate('ChatThread', { conversationId: data, title: tourName, isGroup: true, tourId });
+  }
+
   // Any tour member can export — this just re-delivers their own
   // already-RLS-filtered schedule view as a file, not a new visibility
   // grant (see "tour exports readable/writable by tour members",
@@ -287,11 +299,16 @@ export function TourDashboardScreen({ route, navigation }: Props) {
     >
       <View style={styles.titleRow}>
         <Text style={styles.tourName}>{tourName}</Text>
-        {isManager && (
-          <Pressable onPress={() => navigation.navigate('TourSettings', { tourId, tourName })}>
-            <Text style={styles.settingsLink}>Settings</Text>
+        <View style={styles.titleActions}>
+          <Pressable onPress={handleOpenChat}>
+            <Text style={styles.settingsLink}>Chat</Text>
           </Pressable>
-        )}
+          {isManager && (
+            <Pressable onPress={() => navigation.navigate('TourSettings', { tourId, tourName })}>
+              <Text style={styles.settingsLink}>Settings</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
       {effectiveRole && (
         <Text style={styles.roleBadge}>
@@ -504,6 +521,11 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.6,
       flexShrink: 1,
+    },
+    titleActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
     },
     settingsLink: {
       color: colors.textDim,
