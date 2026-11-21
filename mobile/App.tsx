@@ -30,6 +30,7 @@ import { MfaChallengeScreen } from './screens/MfaChallengeScreen';
 import { CompleteProfileScreen } from './screens/CompleteProfileScreen';
 import { TourListScreen } from './screens/TourListScreen';
 import { TourDashboardScreen } from './screens/TourDashboardScreen';
+import { TourSettingsScreen } from './screens/TourSettingsScreen';
 import { TravelScreen } from './screens/TravelScreen';
 import { AddFlightScreen } from './screens/AddFlightScreen';
 import { LodgingScreen } from './screens/LodgingScreen';
@@ -129,6 +130,7 @@ function RootNavigator() {
             component={TourDashboardScreen}
             options={{ headerShown: true, title: '' }}
           />
+          <Stack.Screen name="TourSettings" component={TourSettingsScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Travel" component={TravelScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="AddFlight" component={AddFlightScreen} options={{ headerShown: true, title: '' }} />
           <Stack.Screen name="Lodging" component={LodgingScreen} options={{ headerShown: true, title: '' }} />

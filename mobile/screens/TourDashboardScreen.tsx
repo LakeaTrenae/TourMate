@@ -254,7 +254,14 @@ export function TourDashboardScreen({ route, navigation }: Props) {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
     >
-      <Text style={styles.tourName}>{tourName}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.tourName}>{tourName}</Text>
+        {isManager && (
+          <Pressable onPress={() => navigation.navigate('TourSettings', { tourId, tourName })}>
+            <Text style={styles.settingsLink}>Settings</Text>
+          </Pressable>
+        )}
+      </View>
       {effectiveRole && (
         <Text style={styles.roleBadge}>
           {formatRole(effectiveRole)} · {formatDepartment(department)}
@@ -436,11 +443,22 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 20,
       paddingBottom: 40,
     },
+    titleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
     tourName: {
       color: colors.text,
       fontSize: 26,
       fontFamily: fonts.displayBlack,
       letterSpacing: -0.4,
+      flexShrink: 1,
+    },
+    settingsLink: {
+      color: colors.textDim,
+      fontSize: 14,
+      fontFamily: fonts.bodyMedium,
     },
     roleBadge: {
       color: colors.textDim,

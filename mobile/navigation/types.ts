@@ -11,6 +11,7 @@ export type RootStackParamList = {
   MfaChallenge: undefined;
   TourList: undefined;
   TourDashboard: { tourId: string; tourName: string };
+  TourSettings: { tourId: string; tourName: string };
   Travel: { tourId: string; tourName: string };
   AddFlight: { tourId: string };
   Lodging: { tourId: string; tourName: string };

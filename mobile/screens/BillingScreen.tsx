@@ -52,6 +52,7 @@ export function BillingScreen() {
   const [managingBilling, setManagingBilling] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [devUpdating, setDevUpdating] = useState(false);
 
   async function load() {
     if (!session) return;
@@ -116,6 +117,24 @@ export function BillingScreen() {
       return;
     }
     await Linking.openURL(data.url);
+  }
+
+  // Dev-only bypass for exercising owner/admin/manager flows without a real
+  // Stripe subscription — writes directly to this user's OWN profiles row,
+  // which "profiles are updatable by self" (0001_init.sql) already permits.
+  // Gated on __DEV__ (false in any production/TestFlight build) so this
+  // never ships as a real billing bypass.
+  async function handleDevSetStatus(status: 'active' | 'none') {
+    if (!session) return;
+    setDevUpdating(true);
+    setErrorMessage(null);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ subscription_status: status, trial_ends_at: status === 'active' ? null : null })
+      .eq('id', session.user.id);
+    if (error) setErrorMessage(error.message);
+    else await load();
+    setDevUpdating(false);
   }
 
   async function handleManageBilling() {
@@ -218,6 +237,33 @@ export function BillingScreen() {
           )}
         </Pressable>
       )}
+
+      {__DEV__ && (
+        <View style={styles.devCard}>
+          <Text style={styles.devTitle}>Developer Testing</Text>
+          <Text style={styles.devHint}>
+            Dev-build only — overrides your own billing status directly for testing. Never appears in a production
+            build.
+          </Text>
+          <View style={styles.devButtonRow}>
+            <Pressable
+              style={styles.devButton}
+              onPress={() => handleDevSetStatus('active')}
+              disabled={devUpdating}
+            >
+              <Text style={styles.devButtonText}>Force full access</Text>
+            </Pressable>
+            <Pressable
+              style={styles.devButton}
+              onPress={() => handleDevSetStatus('none')}
+              disabled={devUpdating}
+            >
+              <Text style={styles.devButtonText}>Force crew access</Text>
+            </Pressable>
+          </View>
+          {devUpdating && <ActivityIndicator color={colors.spark} style={styles.devSpinner} />}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -259,5 +305,33 @@ function createStyles(colors: ThemeColors) {
       marginBottom: 8,
     },
     secondaryButtonText: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    devCard: {
+      borderWidth: 1,
+      borderColor: colors.spark,
+      borderStyle: 'dashed',
+      borderRadius: 10,
+      padding: 14,
+      marginTop: 24,
+    },
+    devTitle: {
+      color: colors.spark,
+      fontSize: 12,
+      fontFamily: fonts.bodySemiBold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    devHint: { color: colors.textDim, fontSize: 12, lineHeight: 16, marginBottom: 12, fontFamily: fonts.body },
+    devButtonRow: { flexDirection: 'row', gap: 8 },
+    devButton: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.spark,
+      borderRadius: 8,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    devButtonText: { color: colors.spark, fontSize: 12, fontFamily: fonts.bodySemiBold },
+    devSpinner: { marginTop: 10 },
   });
 }
