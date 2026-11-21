@@ -28,7 +28,6 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
-import { getInvokeErrorMessage } from '../lib/functionError';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -63,7 +62,6 @@ export function TravelScreen({ route, navigation }: Props) {
   const [passengersByFlight, setPassengersByFlight] = useState<Record<string, PassengerRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function load() {
@@ -125,18 +123,6 @@ export function TravelScreen({ route, navigation }: Props) {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  }
-
-  async function handleCheckStatus(flightId: string) {
-    setErrorMessage(null);
-    setCheckingStatusId(flightId);
-    const { data, error } = await supabase.functions.invoke('flight-status', { body: { flightId } });
-    setCheckingStatusId(null);
-    if (error || data?.error) {
-      setErrorMessage(await getInvokeErrorMessage(error, data, 'Failed to check flight status.'));
-      return;
-    }
-    await load();
   }
 
   function confirmDelete(flight: Flight) {
@@ -230,19 +216,6 @@ export function TravelScreen({ route, navigation }: Props) {
 
               {flight.confirmation_code && (
                 <Text style={styles.confirmation}>Confirmation: {flight.confirmation_code}</Text>
-              )}
-
-              {flight.flight_number && (
-                <Pressable style={styles.refreshRow} onPress={() => handleCheckStatus(flight.id)} disabled={checkingStatusId === flight.id}>
-                  {checkingStatusId === flight.id ? (
-                    <ActivityIndicator color={colors.accent} size="small" />
-                  ) : (
-                    <Text style={styles.refreshText}>
-                      ↻ Refresh live status
-                      {flight.status_checked_at ? ` · checked ${formatDateTime(flight.status_checked_at)}` : ''}
-                    </Text>
-                  )}
-                </Pressable>
               )}
 
               <View style={styles.passengers}>
@@ -391,8 +364,6 @@ function createStyles(colors: ThemeColors) {
       marginTop: 10,
       fontFamily: fonts.mono,
     },
-    refreshRow: { marginTop: 8, alignSelf: 'flex-start' },
-    refreshText: { color: colors.accent, fontSize: 11.5, fontFamily: fonts.bodySemiBold },
     passengers: {
       marginTop: 10,
       borderTopWidth: 1,
