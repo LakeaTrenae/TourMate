@@ -28,9 +28,13 @@ type Props = {
   onPress?: () => void;
   onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  // Edge-to-edge body (no 14px inset) — for content that wants to touch
+  // the card's own rounded top corners, like a cover photo, rather than
+  // sitting inside the usual padded body.
+  noBodyPadding?: boolean;
 };
 
-export function TicketCard({ children, stubLeft, stubRight, onPress, onLongPress, style }: Props) {
+export function TicketCard({ children, stubLeft, stubRight, onPress, onLongPress, style, noBodyPadding }: Props) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const hasStub = !!(stubLeft || stubRight);
@@ -39,7 +43,7 @@ export function TicketCard({ children, stubLeft, stubRight, onPress, onLongPress
 
   return (
     <Wrapper style={[styles.ticket, style]} onPress={onPress} onLongPress={onLongPress}>
-      <View style={styles.body}>{children}</View>
+      <View style={[styles.body, noBodyPadding && styles.bodyNoPadding]}>{children}</View>
       {hasStub && (
         <>
           <View style={styles.perf}>
@@ -71,6 +75,7 @@ function createStyles(colors: ThemeColors) {
       elevation: 2,
     },
     body: { padding: 14 },
+    bodyNoPadding: { padding: 0, borderRadius: 14, overflow: 'hidden' },
     perf: {
       height: 0,
       borderTopWidth: 2,

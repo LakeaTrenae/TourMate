@@ -20,12 +20,13 @@
  * FlatList-only), so each section's tours are pre-chunked into pairs and
  * rendered as rows of up to two cards.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  ImageBackground,
   Pressable,
   RefreshControl,
   SectionList,
@@ -52,6 +53,7 @@ type TourRow = {
   start_date: string | null;
   end_date: string | null;
   completed_at: string | null;
+  cover_photo_path: string | null;
   organization: { id: string; name: string } | null;
 };
 
@@ -107,13 +109,36 @@ export function TourListScreen({ navigation }: Props) {
   const fetchTours = useCallback(async () => {
     const { data, error } = await supabase
       .from('tours')
-      .select('id, name, start_date, end_date, completed_at, organization:organizations(id, name)');
+      .select('id, name, start_date, end_date, completed_at, cover_photo_path, organization:organizations(id, name)');
     if (error) throw error;
     return (data ?? []) as unknown as TourRow[];
   }, []);
 
   const { data: toursData, loading, isOffline, refresh } = useCachedLoad('tour-list', fetchTours);
   const tours = toursData ?? [];
+
+  // One batched call for every cover photo on screen rather than N signed-
+  // URL requests — tour-covers is a private bucket, so a plain public URL
+  // won't work here the way it does for the public `avatars` bucket.
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const withCovers = tours.filter((t) => t.cover_photo_path);
+    if (withCovers.length === 0) {
+      setCoverUrls({});
+      return;
+    }
+    supabase.storage
+      .from('tour-covers')
+      .createSignedUrls(withCovers.map((t) => t.cover_photo_path!), 3600)
+      .then(({ data }) => {
+        const next: Record<string, string> = {};
+        withCovers.forEach((t, i) => {
+          const url = data?.[i]?.signedUrl;
+          if (url) next[t.id] = url;
+        });
+        setCoverUrls(next);
+      });
+  }, [tours]);
 
   // useFocusEffect (not a plain useEffect) so the list re-fetches every
   // time this screen comes back into focus — e.g. after backing out of a
@@ -250,19 +275,31 @@ export function TourListScreen({ navigation }: Props) {
     const isUpcoming = status === 'upcoming';
     const tone = isActive ? 'signature' : isUpcoming ? 'spark' : 'neutral';
     const statusLabel = isActive ? 'Active' : isUpcoming ? 'Upcoming' : 'Completed';
+    const coverUrl = coverUrls[item.id];
 
     return (
       <TicketCard
         key={item.id}
         style={styles.tourCard}
+        noBodyPadding={!!coverUrl}
         onPress={() => navigation.navigate('TourDashboard', { tourId: item.id, tourName: item.name })}
         stubLeft={
           item.organization ? <Text style={styles.eyebrow}>{item.organization.name.toUpperCase()}</Text> : undefined
         }
         stubRight={<StampBadge label={statusLabel} tone={tone} />}
       >
-        <Text style={styles.tourName}>{item.name}</Text>
-        <Text style={styles.tourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
+        {coverUrl ? (
+          <ImageBackground source={{ uri: coverUrl }} style={styles.coverImage}>
+            <View style={styles.coverScrim} />
+            <Text style={styles.coverTourName}>{item.name}</Text>
+            <Text style={styles.coverTourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
+          </ImageBackground>
+        ) : (
+          <>
+            <Text style={styles.tourName}>{item.name}</Text>
+            <Text style={styles.tourDates}>{formatDateRange(item.start_date, item.end_date)}</Text>
+          </>
+        )}
       </TicketCard>
     );
   }
@@ -370,9 +407,9 @@ function createStyles(colors: ThemeColors) {
     },
     headerTitle: {
       color: colors.text,
-      fontSize: 28,
+      fontSize: 32,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.5,
+      letterSpacing: -0.7,
     },
     headerActions: {
       flexDirection: 'row',
@@ -506,6 +543,32 @@ function createStyles(colors: ThemeColors) {
       color: colors.textDim,
       fontSize: 11,
       fontFamily: fonts.mono,
+    },
+    coverImage: {
+      height: 130,
+      padding: 12,
+      justifyContent: 'flex-end',
+    },
+    coverScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: '75%',
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    coverTourName: {
+      color: '#ffffff',
+      fontSize: 19,
+      fontFamily: fonts.displayBlack,
+      letterSpacing: -0.3,
+      lineHeight: 21,
+    },
+    coverTourDates: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: 11,
+      fontFamily: fonts.mono,
+      marginTop: 3,
     },
   });
 }

@@ -16,7 +16,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { supabase } from '../lib/supabase';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
@@ -33,6 +34,9 @@ export function TourSettingsScreen({ route, navigation }: Props) {
   const [effectiveRole, setEffectiveRole] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [name, setName] = useState(tourName);
+  const [coverPhotoPath, setCoverPhotoPath] = useState<string | null>(null);
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [togglingComplete, setTogglingComplete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -45,7 +49,7 @@ export function TourSettingsScreen({ route, navigation }: Props) {
 
     const [{ data: roleData, error: roleError }, { data: tourData, error: tourError }] = await Promise.all([
       supabase.rpc('effective_tour_role', { p_tour_id: tourId, p_user_id: userId }),
-      supabase.from('tours').select('name, completed_at').eq('id', tourId).single(),
+      supabase.from('tours').select('name, completed_at, cover_photo_path').eq('id', tourId).single(),
     ]);
     if (roleError) throw roleError;
     if (tourError) throw tourError;
@@ -53,7 +57,69 @@ export function TourSettingsScreen({ route, navigation }: Props) {
     setEffectiveRole(roleData ?? null);
     setCompletedAt(tourData?.completed_at ?? null);
     setName(tourData?.name ?? tourName);
+    setCoverPhotoPath(tourData?.cover_photo_path ?? null);
+
+    if (tourData?.cover_photo_path) {
+      const { data: signed } = await supabase.storage.from('tour-covers').createSignedUrl(tourData.cover_photo_path, 3600);
+      setCoverPhotoUrl(signed?.signedUrl ?? null);
+    } else {
+      setCoverPhotoUrl(null);
+    }
   }, [tourId, tourName]);
+
+  async function handlePickCoverPhoto() {
+    setErrorMessage(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setErrorMessage('Photo library access is needed to set a cover photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [16, 9],
+    });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+
+    setUploadingPhoto(true);
+    try {
+      const response = await fetch(asset.uri);
+      const fileData = await response.arrayBuffer();
+      const path = `${tourId}/cover`;
+      const { error: uploadError } = await supabase.storage
+        .from('tour-covers')
+        .upload(path, fileData, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase.from('tours').update({ cover_photo_path: path }).eq('id', tourId);
+      if (updateError) throw updateError;
+
+      await load();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to upload cover photo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleRemoveCoverPhoto() {
+    if (!coverPhotoPath) return;
+    setErrorMessage(null);
+    setUploadingPhoto(true);
+    try {
+      const { error: updateError } = await supabase.from('tours').update({ cover_photo_path: null }).eq('id', tourId);
+      if (updateError) throw updateError;
+      await supabase.storage.from('tour-covers').remove([coverPhotoPath]);
+      await load();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to remove cover photo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -139,6 +205,23 @@ export function TourSettingsScreen({ route, navigation }: Props) {
 
       {isManager && (
         <>
+          <Text style={styles.sectionTitle}>Cover Photo</Text>
+          {coverPhotoUrl && <Image source={{ uri: coverPhotoUrl }} style={styles.coverPreview} />}
+          <View style={styles.coverButtonRow}>
+            <Pressable style={[styles.secondaryButton, styles.coverPickButton]} onPress={handlePickCoverPhoto} disabled={uploadingPhoto}>
+              {uploadingPhoto ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Text style={styles.secondaryButtonText}>{coverPhotoUrl ? 'Change Photo' : 'Add Photo'}</Text>
+              )}
+            </Pressable>
+            {coverPhotoUrl && (
+              <Pressable style={styles.coverRemoveButton} onPress={handleRemoveCoverPhoto} disabled={uploadingPhoto}>
+                <Text style={styles.coverRemoveButtonText}>Remove</Text>
+              </Pressable>
+            )}
+          </View>
+
           <Text style={styles.sectionTitle}>Name</Text>
           <TextInput
             style={styles.input}
@@ -205,7 +288,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
     readOnlyHint: { color: colors.textDim, fontSize: 13, lineHeight: 18, fontFamily: fonts.body },
     sectionTitle: {
@@ -229,6 +312,18 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
+    coverPreview: { width: '100%', height: 140, borderRadius: 12, marginBottom: 10, backgroundColor: colors.surface2 },
+    coverButtonRow: { flexDirection: 'row', gap: 8 },
+    coverPickButton: { flex: 1 },
+    coverRemoveButton: {
+      borderWidth: 1,
+      borderColor: colors.danger,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+    },
+    coverRemoveButtonText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bodySemiBold },
     saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
     saveButtonDisabled: { opacity: 0.5 },
     saveButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bodySemiBold },
