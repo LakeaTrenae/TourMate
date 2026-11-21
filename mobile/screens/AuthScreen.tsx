@@ -10,8 +10,11 @@
  * best and give a false sense of security at worst (client-side checks
  * are always bypassable).
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * This is the app's front-of-house moment, so it leans into the "Marquee"
+ * system harder than a plain form screen would — the wordmark reads like
+ * a marquee sign (wide tracking + chase-light dots), and the form itself
+ * sits inside a TicketCard with a stamped mode badge in the stub, instead
+ * of a bare input stack. See lib/theme.tsx for the palette/type tokens.
  */
 import { useMemo, useState } from 'react';
 import {
@@ -20,6 +23,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -29,8 +33,13 @@ import {
 import { useAuth } from '../lib/auth-context';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../lib/legal';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
+import { TicketCard } from '../components/TicketCard';
+import { StampBadge } from '../components/StampBadge';
+import { MarqueeChaseLight } from '../components/MarqueeChaseLight';
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot';
+
+const MODE_BADGE: Record<Mode, string> = { 'sign-in': 'Sign In', 'sign-up': 'New Account', forgot: 'Reset' };
 
 export function AuthScreen() {
   const { signInWithPassword, signUp, requestPasswordReset } = useAuth();
@@ -98,119 +107,127 @@ export function AuthScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Text style={styles.title}>TourMate</Text>
-      <Text style={styles.subtitle}>
-        {isForgot ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your tours'}
-      </Text>
-
-      {isSignUp && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="First name"
-            placeholderTextColor={colors.textFaint}
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-            autoComplete="given-name"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Last name"
-            placeholderTextColor={colors.textFaint}
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-            autoComplete="family-name"
-          />
-          {/* You'll be able to set a preferred name — what everyone on a
-              tour actually sees — right after this, on the profile-setup
-              screen. First/last name here is just the account identity. */}
-          <Text style={styles.hint}>You can set a preferred name after signing up.</Text>
-        </>
-      )}
-
-      {resetSent ? (
-        <Text style={styles.hint}>
-          If an account exists for {email.trim()}, a reset link is on its way. Open it to set a new
-          password.
-        </Text>
-      ) : (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.textFaint}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-          />
-
-          {!isForgot && (
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor={colors.textFaint}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-            />
-          )}
-
-          {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
-
-          <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <Text style={styles.submitButtonText}>
-                {isForgot ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in'}
-              </Text>
-            )}
-          </Pressable>
-
-          {isSignUp && (
-            <Text style={styles.agreementText}>
-              By creating an account you agree to our{' '}
-              <Text style={styles.agreementLink} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
-                Terms of Service
-              </Text>{' '}
-              and{' '}
-              <Text style={styles.agreementLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-                Privacy Policy
-              </Text>
-              .
-            </Text>
-          )}
-        </>
-      )}
-
-      {!isForgot && (
-        <Pressable onPress={() => switchMode(isSignUp ? 'sign-in' : 'sign-up')}>
-          <Text style={styles.toggleText}>
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.marquee}>
+          <Text style={styles.wordmark}>TOURMATE</Text>
+          <MarqueeChaseLight />
+          <Text style={styles.subtitle}>
+            {isForgot ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your tours'}
           </Text>
-        </Pressable>
-      )}
+        </View>
 
-      {mode === 'sign-in' && (
-        <Pressable onPress={() => switchMode('forgot')}>
-          <Text style={styles.toggleTextSecondary}>Forgot password?</Text>
-        </Pressable>
-      )}
+        <TicketCard
+          style={styles.card}
+          stubLeft={<Text style={styles.eyebrow}>TOURMATE PASS</Text>}
+          stubRight={<StampBadge label={MODE_BADGE[mode]} tone={isForgot ? 'neutral' : isSignUp ? 'spark' : 'signature'} />}
+        >
+          {isSignUp && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="First name"
+                placeholderTextColor={colors.textFaint}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+                autoComplete="given-name"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last name"
+                placeholderTextColor={colors.textFaint}
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+                autoComplete="family-name"
+              />
+              {/* You'll be able to set a preferred name — what everyone on a
+                  tour actually sees — right after this, on the profile-setup
+                  screen. First/last name here is just the account identity. */}
+              <Text style={styles.hint}>You can set a preferred name after signing up.</Text>
+            </>
+          )}
 
-      {isForgot && (
-        <Pressable onPress={() => switchMode('sign-in')}>
-          <Text style={styles.toggleText}>Back to sign in</Text>
-        </Pressable>
-      )}
+          {resetSent ? (
+            <Text style={styles.hint}>
+              If an account exists for {email.trim()}, a reset link is on its way. Open it to set a new
+              password.
+            </Text>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={colors.textFaint}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+              />
+
+              {!isForgot && (
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor={colors.textFaint}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                />
+              )}
+
+              {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+
+              <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
+                {submitting ? (
+                  <ActivityIndicator color={colors.onAccent} />
+                ) : (
+                  <Text style={styles.submitButtonText}>
+                    {isForgot ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in'}
+                  </Text>
+                )}
+              </Pressable>
+
+              {isSignUp && (
+                <Text style={styles.agreementText}>
+                  By creating an account you agree to our{' '}
+                  <Text style={styles.agreementLink} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
+                    Terms of Service
+                  </Text>{' '}
+                  and{' '}
+                  <Text style={styles.agreementLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                    Privacy Policy
+                  </Text>
+                  .
+                </Text>
+              )}
+            </>
+          )}
+        </TicketCard>
+
+        {!isForgot && (
+          <Pressable onPress={() => switchMode(isSignUp ? 'sign-in' : 'sign-up')}>
+            <Text style={styles.toggleText}>
+              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+            </Text>
+          </Pressable>
+        )}
+
+        {mode === 'sign-in' && (
+          <Pressable onPress={() => switchMode('forgot')}>
+            <Text style={styles.toggleTextSecondary}>Forgot password?</Text>
+          </Pressable>
+        )}
+
+        {isForgot && (
+          <Pressable onPress={() => switchMode('sign-in')}>
+            <Text style={styles.toggleText}>Back to sign in</Text>
+          </Pressable>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -220,23 +237,39 @@ function createStyles(colors: ThemeColors) {
     container: {
       flex: 1,
       backgroundColor: colors.bg,
+    },
+    scrollContent: {
+      flexGrow: 1,
       justifyContent: 'center',
       paddingHorizontal: 24,
+      paddingVertical: 40,
     },
-    title: {
+    marquee: {
+      alignItems: 'center',
+      marginBottom: 28,
+    },
+    wordmark: {
       color: colors.text,
-      fontSize: 34,
+      fontSize: 42,
       fontFamily: fonts.displayBlack,
       textAlign: 'center',
-      letterSpacing: -0.5,
+      letterSpacing: 4,
     },
     subtitle: {
       color: colors.textDim,
       fontSize: 14,
       textAlign: 'center',
-      marginTop: 6,
-      marginBottom: 32,
+      marginTop: 14,
       fontFamily: fonts.body,
+    },
+    card: {
+      marginBottom: 20,
+    },
+    eyebrow: {
+      color: colors.textDim,
+      fontSize: 10,
+      fontFamily: fonts.mono,
+      letterSpacing: 0.6,
     },
     input: {
       backgroundColor: colors.surface,
