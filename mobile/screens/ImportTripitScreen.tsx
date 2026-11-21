@@ -255,7 +255,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centeredContainer: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 8, textAlign: 'center' },
+    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 8, textAlign: 'center' },
     subtitle: { color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16, fontFamily: fonts.body },
     sectionTitle: { color: colors.textDim, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 10, marginBottom: 8 },
     error: { color: colors.danger, fontSize: 13, textAlign: 'center', marginBottom: 12, fontFamily: fonts.body },

@@ -450,9 +450,9 @@ function createStyles(colors: ThemeColors) {
     },
     tourName: {
       color: colors.text,
-      fontSize: 26,
+      fontSize: 30,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.4,
+      letterSpacing: -0.6,
       flexShrink: 1,
     },
     settingsLink: {

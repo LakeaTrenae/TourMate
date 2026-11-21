@@ -380,7 +380,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, marginBottom: 20, fontFamily: fonts.body },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
     card: {

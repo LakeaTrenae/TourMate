@@ -162,7 +162,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg, paddingTop: 20, paddingHorizontal: 20 },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     header: { marginBottom: 16 },
-    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
     chipRow: { flexGrow: 0, marginBottom: 12 },
     chipRowContent: { gap: 8, paddingRight: 8 },

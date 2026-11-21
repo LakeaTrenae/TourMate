@@ -260,7 +260,7 @@ function createStyles(colors: ThemeColors) {
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
     headerActions: { flexDirection: 'row', gap: 8 },
-    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4 },
+    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6 },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
     toggleButton: { backgroundColor: colors.surface2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
     toggleButtonText: { color: colors.accent, fontSize: 13, fontFamily: fonts.bodySemiBold },

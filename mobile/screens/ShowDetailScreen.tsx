@@ -432,7 +432,7 @@ function createStyles(colors: ThemeColors) {
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
-    dateLabel: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    dateLabel: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack },
     statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 16 },
     statusBadge: { fontSize: 12, fontFamily: fonts.bodyBold, letterSpacing: 0.5 },
     weather: { color: colors.textDim, fontSize: 13, fontFamily: fonts.mono },

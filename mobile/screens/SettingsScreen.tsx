@@ -548,7 +548,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 26, fontFamily: fonts.displayBlack, letterSpacing: -0.4, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 30, fontFamily: fonts.displayBlack, letterSpacing: -0.6, marginBottom: 16 },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
     avatarSection: { alignItems: 'center', marginBottom: 24 },
     avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surface },

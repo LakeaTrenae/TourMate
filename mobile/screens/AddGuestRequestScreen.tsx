@@ -137,7 +137,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold, marginBottom: 16 },
+    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack, marginBottom: 16 },
     sectionTitle: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold, marginBottom: 8 },
     dateRow: {
       flexDirection: 'row',

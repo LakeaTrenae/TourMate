@@ -287,7 +287,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
-    title: { color: colors.text, fontSize: 22, fontFamily: fonts.displayBold },
+    title: { color: colors.text, fontSize: 24, fontFamily: fonts.displayBlack },
     subtitle: { color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 12, fontFamily: fonts.body },
     error: { color: colors.danger, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
     emptyText: { color: colors.textFaint, fontSize: 14, marginTop: 12, marginBottom: 12, fontFamily: fonts.body },
