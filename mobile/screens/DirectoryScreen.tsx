@@ -10,8 +10,9 @@
  * "tour_members readable by fellow tour members" (0002_policy_gaps.sql)
  * and "profiles readable by fellow tour or org members" (0011).
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. Each department's roster is chunked into pairs for a
+ * 2-up grid, same trick as TourListScreen/GuestListScreen.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -56,6 +57,12 @@ const DEPARTMENT_ORDER = [
   'finance',
   'general',
 ];
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 export function DirectoryScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
@@ -203,49 +210,58 @@ export function DirectoryScreen({ route, navigation }: Props) {
           grouped.map((group) => (
             <View key={group.department} style={styles.group}>
               <Text style={styles.groupTitle}>{formatDepartment(group.department)}</Text>
-              {group.people.map((p) => (
-                <View key={p.user_id} style={styles.card}>
-                  <Text style={styles.name}>{p.profile?.display_name ?? 'Unknown'}</Text>
-                  <Text style={styles.role}>{formatRole(p.role)}</Text>
-                  {p.profile?.phone && (
-                    <Pressable onPress={() => Linking.openURL(`tel:${p.profile!.phone}`)}>
-                      <Text style={styles.contactLink}>{p.profile.phone}</Text>
-                    </Pressable>
-                  )}
-                  {p.profile?.email && (
-                    <Pressable onPress={() => Linking.openURL(`mailto:${p.profile!.email}`)}>
-                      <Text style={styles.contactLink}>{p.profile.email}</Text>
-                    </Pressable>
-                  )}
-                  {session && p.user_id !== session.user.id && (
-                    <Pressable onPress={() => handleMessage(p.user_id, p.profile?.display_name)}>
-                      <Text style={styles.passportLink}>Message ›</Text>
-                    </Pressable>
-                  )}
-                  {isManager && (
-                    <Pressable
-                      onPress={() =>
-                        navigation.navigate('PassportVisa', {
-                          targetUserId: p.user_id,
-                          targetName: p.profile?.display_name ?? undefined,
-                        })
-                      }
-                    >
-                      <Text style={styles.passportLink}>Passport & Visa ›</Text>
-                    </Pressable>
-                  )}
-                  {isManager && (
-                    <Pressable
-                      onPress={() =>
-                        navigation.navigate('EmergencyContact', {
-                          targetUserId: p.user_id,
-                          targetName: p.profile?.display_name ?? undefined,
-                        })
-                      }
-                    >
-                      <Text style={styles.passportLink}>Emergency Contact ›</Text>
-                    </Pressable>
-                  )}
+              {chunkPairs(group.people).map((row, i) => (
+                <View key={i} style={styles.row}>
+                  {row.map((p) => (
+                    <View key={p.user_id} style={styles.card}>
+                      <Text style={styles.name}>{p.profile?.display_name ?? 'Unknown'}</Text>
+                      <Text style={styles.role}>{formatRole(p.role)}</Text>
+                      {p.profile?.phone && (
+                        <Pressable onPress={() => Linking.openURL(`tel:${p.profile!.phone}`)}>
+                          <Text style={styles.contactLink} numberOfLines={1}>
+                            {p.profile.phone}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {p.profile?.email && (
+                        <Pressable onPress={() => Linking.openURL(`mailto:${p.profile!.email}`)}>
+                          <Text style={styles.contactLink} numberOfLines={1}>
+                            {p.profile.email}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {session && p.user_id !== session.user.id && (
+                        <Pressable onPress={() => handleMessage(p.user_id, p.profile?.display_name)}>
+                          <Text style={styles.passportLink}>Message ›</Text>
+                        </Pressable>
+                      )}
+                      {isManager && (
+                        <Pressable
+                          onPress={() =>
+                            navigation.navigate('PassportVisa', {
+                              targetUserId: p.user_id,
+                              targetName: p.profile?.display_name ?? undefined,
+                            })
+                          }
+                        >
+                          <Text style={styles.passportLink}>Passport & Visa ›</Text>
+                        </Pressable>
+                      )}
+                      {isManager && (
+                        <Pressable
+                          onPress={() =>
+                            navigation.navigate('EmergencyContact', {
+                              targetUserId: p.user_id,
+                              targetName: p.profile?.display_name ?? undefined,
+                            })
+                          }
+                        >
+                          <Text style={styles.passportLink}>Emergency ›</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                  {row.length === 1 && <View style={styles.cardSpacer} />}
                 </View>
               ))}
             </View>
@@ -298,11 +314,13 @@ function createStyles(colors: ThemeColors) {
       letterSpacing: 0.6,
       marginBottom: 8,
     },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 14,
-      marginBottom: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,

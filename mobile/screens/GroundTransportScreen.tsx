@@ -7,8 +7,10 @@
  * they're a passenger on ("ground_transport readable by assigned
  * passenger").
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. 2-up via chunkPairs; the pickup→dropoff route block
+ * went from side-by-side to stacked (with a down arrow) since two
+ * location names rarely fit next to each other at half card width.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -47,6 +49,12 @@ type Leg = {
 type PassengerRow = { ground_transport_id: string; user_id: string; seat: string | null; profile: { display_name: string } | null };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 export function GroundTransportScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
@@ -172,50 +180,60 @@ export function GroundTransportScreen({ route, navigation }: Props) {
               : "No ground transport assigned to you yet — you'll only see legs you're booked on."}
           </Text>
         ) : (
-          sortedLegs.map((leg) => (
-            <Pressable
-              key={leg.id}
-              style={styles.card}
-              onLongPress={isManager ? () => confirmDelete(leg) : undefined}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.vehicle}>{leg.vehicle_type ?? 'Transport'}{leg.company ? ` · ${leg.company}` : ''}</Text>
-                {isManager && (
-                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(leg)}>
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </Pressable>
-                )}
-              </View>
+          chunkPairs(sortedLegs).map((row, i) => (
+            <View key={i} style={styles.row}>
+              {row.map((leg) => (
+                <Pressable key={leg.id} style={styles.card} onLongPress={isManager ? () => confirmDelete(leg) : undefined}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.vehicle} numberOfLines={1}>
+                      {leg.vehicle_type ?? 'Transport'}
+                      {leg.company ? ` · ${leg.company}` : ''}
+                    </Text>
+                    {isManager && (
+                      <Pressable style={styles.deleteButton} onPress={() => confirmDelete(leg)}>
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </Pressable>
+                    )}
+                  </View>
 
-              <View style={styles.route}>
-                <View style={styles.leg}>
-                  <Text style={styles.location}>{leg.pickup_location}</Text>
-                  <Text style={styles.time}>{formatDateTime(leg.pickup_time)}</Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-                <View style={styles.leg}>
-                  <Text style={styles.location}>{leg.dropoff_location}</Text>
-                  <Text style={styles.time}>{formatDateTime(leg.dropoff_time)}</Text>
-                </View>
-              </View>
+                  <View style={styles.route}>
+                    <View style={styles.leg}>
+                      <Text style={styles.location} numberOfLines={1}>
+                        {leg.pickup_location}
+                      </Text>
+                      <Text style={styles.time}>{formatDateTime(leg.pickup_time)}</Text>
+                    </View>
+                    <Text style={styles.arrow}>↓</Text>
+                    <View style={styles.leg}>
+                      <Text style={styles.location} numberOfLines={1}>
+                        {leg.dropoff_location}
+                      </Text>
+                      <Text style={styles.time}>{formatDateTime(leg.dropoff_time)}</Text>
+                    </View>
+                  </View>
 
-              {leg.driver_name && (
-                <Text style={styles.driver}>
-                  Driver: {leg.driver_name}
-                  {leg.driver_phone ? ` · ${leg.driver_phone}` : ''}
-                </Text>
-              )}
-              {leg.confirmation_code && <Text style={styles.confirmation}>Confirmation: {leg.confirmation_code}</Text>}
+                  {leg.driver_name && (
+                    <Text style={styles.driver} numberOfLines={1}>
+                      Driver: {leg.driver_name}
+                      {leg.driver_phone ? ` · ${leg.driver_phone}` : ''}
+                    </Text>
+                  )}
+                  {leg.confirmation_code && <Text style={styles.confirmation}>Confirmation: {leg.confirmation_code}</Text>}
 
-              <View style={styles.passengers}>
-                {(passengersByLeg[leg.id] ?? []).map((p) => (
-                  <Text key={p.user_id} style={styles.passenger}>
-                    {p.profile?.display_name ?? 'Unknown'}
-                    {p.seat ? ` · Seat ${p.seat}` : ''}
-                  </Text>
-                ))}
-              </View>
-            </Pressable>
+                  {(passengersByLeg[leg.id] ?? []).length > 0 && (
+                    <View style={styles.passengers}>
+                      {(passengersByLeg[leg.id] ?? []).map((p) => (
+                        <Text key={p.user_id} style={styles.passenger} numberOfLines={1}>
+                          {p.profile?.display_name ?? 'Unknown'}
+                          {p.seat ? ` · Seat ${p.seat}` : ''}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+              {row.length === 1 && <View style={styles.cardSpacer} />}
+            </View>
           ))
         )}
         {isManager && sortedLegs.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a leg) to remove it.</Text>}
@@ -236,26 +254,28 @@ function createStyles(colors: ThemeColors) {
     error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },
     emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', paddingHorizontal: 20, fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 14,
       padding: 16,
-      marginBottom: 12,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 10,
       elevation: 2,
     },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    vehicle: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 },
+    vehicle: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold, flexShrink: 1 },
     deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
     deleteButtonText: { color: colors.danger, fontSize: 15, fontFamily: fonts.bodySemiBold },
-    route: { flexDirection: 'row', alignItems: 'center' },
-    leg: { flex: 1 },
-    location: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold },
+    route: {},
+    leg: {},
+    location: { color: colors.text, fontSize: 17, fontFamily: fonts.displayBold },
     time: { color: colors.textDim, fontSize: 15, marginTop: 2, fontFamily: fonts.mono },
-    arrow: { color: colors.textFaint, fontSize: 19, marginHorizontal: 10 },
+    arrow: { color: colors.textFaint, fontSize: 16, marginVertical: 4 },
     driver: { color: colors.textDim, fontSize: 15, marginTop: 10, fontFamily: fonts.body },
     confirmation: { color: colors.textFaint, fontSize: 15, marginTop: 4, fontFamily: fonts.mono },
     passengers: { marginTop: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },

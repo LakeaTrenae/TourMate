@@ -16,8 +16,11 @@
  * server-side rollup needed for a dataset this size (a tour's budget is,
  * at most, a few hundred rows).
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. Every view mode funnels its rows through
+ * renderItemGrid (2-up via chunkPairs) rather than each repeating that
+ * logic — only renderItemRow itself (the actual card) is view-mode-
+ * agnostic content.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -73,6 +76,12 @@ const PHASE_LABELS: Record<BudgetItem['phase'], string> = { rehearsal: 'Rehearsa
 
 function signedAmount(item: BudgetItem): number {
   return item.entry_type === 'income' ? Number(item.amount) : -Number(item.amount);
+}
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
 }
 
 export function BudgetScreen({ route, navigation }: Props) {
@@ -275,17 +284,19 @@ export function BudgetScreen({ route, navigation }: Props) {
         onLongPress={() => confirmDelete(item)}
         disabled={!item.receipt_path}
       >
-        <View style={styles.cardMain}>
-          <Text style={styles.category}>{item.category}</Text>
-          {item.description && <Text style={styles.description}>{item.description}</Text>}
-          <View style={styles.badgeRow}>
-            {item.phase === 'rehearsal' && <Text style={[styles.badge, styles.phaseBadge]}>REHEARSAL</Text>}
-            {item.tour_date?.date && <Text style={styles.badge}>{formatDateOnly(item.tour_date.date, { month: 'short', day: 'numeric' })}</Text>}
-            {item.deposit_status && <Text style={[styles.badge, styles.depositBadge]}>{item.deposit_status.toUpperCase()}</Text>}
-          </View>
-          {item.receipt_path && <Text style={styles.receiptLink}>📎 Receipt</Text>}
+        <Text style={styles.category}>{item.category}</Text>
+        {item.description && (
+          <Text style={styles.description} numberOfLines={2}>
+            {item.description}
+          </Text>
+        )}
+        <View style={styles.badgeRow}>
+          {item.phase === 'rehearsal' && <Text style={[styles.badge, styles.phaseBadge]}>REHEARSAL</Text>}
+          {item.tour_date?.date && <Text style={styles.badge}>{formatDateOnly(item.tour_date.date, { month: 'short', day: 'numeric' })}</Text>}
+          {item.deposit_status && <Text style={[styles.badge, styles.depositBadge]}>{item.deposit_status.toUpperCase()}</Text>}
         </View>
-        <View style={styles.cardActions}>
+        {item.receipt_path && <Text style={styles.receiptLink}>📎 Receipt</Text>}
+        <View style={styles.cardFooter}>
           <Text style={[styles.amount, { color: item.entry_type === 'income' ? colors.success : colors.danger }]}>
             {item.entry_type === 'income' ? '+' : '−'}
             {formatCurrency(Math.abs(item.amount))}
@@ -296,6 +307,19 @@ export function BudgetScreen({ route, navigation }: Props) {
         </View>
       </Pressable>
     );
+  }
+
+  // 2-up grid, used everywhere renderItemRow's individual cards get
+  // listed — plain, by-week, by-category, by-phase, and deposits all
+  // funnel through this one helper rather than repeating chunkPairs at
+  // each of those 5 call sites.
+  function renderItemGrid(rows: BudgetItem[]) {
+    return chunkPairs(rows).map((row, i) => (
+      <View key={i} style={styles.row}>
+        {row.map(renderItemRow)}
+        {row.length === 1 && <View style={styles.cardSpacer} />}
+      </View>
+    ));
   }
 
   if (loading) {
@@ -366,7 +390,7 @@ export function BudgetScreen({ route, navigation }: Props) {
         {items.length === 0 ? (
           <Text style={styles.emptyText}>No entries yet.</Text>
         ) : viewMode === 'all' ? (
-          items.map(renderItemRow)
+          renderItemGrid(items)
         ) : viewMode === 'week' ? (
           weekGroups.map((group) => (
             <View key={group.key}>
@@ -379,7 +403,7 @@ export function BudgetScreen({ route, navigation }: Props) {
                   <Text style={styles.groupRunning}>{formatCurrency(group.running)} running</Text>
                 </View>
               </View>
-              {group.rows.map(renderItemRow)}
+              {renderItemGrid(group.rows)}
             </View>
           ))
         ) : viewMode === 'category' ? (
@@ -420,7 +444,7 @@ export function BudgetScreen({ route, navigation }: Props) {
                   <Text style={styles.groupTitle}>{group.label}</Text>
                   <Text style={[styles.groupNet, { color: group.net >= 0 ? colors.success : colors.danger }]}>{formatCurrency(group.net)}</Text>
                 </View>
-                {group.rows.map(renderItemRow)}
+                {renderItemGrid(group.rows)}
               </View>
             ))}
           </>
@@ -434,14 +458,14 @@ export function BudgetScreen({ route, navigation }: Props) {
               {group.rows.length === 0 ? (
                 <Text style={styles.emptyText}>No {group.label.toLowerCase()} entries yet.</Text>
               ) : (
-                group.rows.map(renderItemRow)
+                renderItemGrid(group.rows)
               )}
             </View>
           ))
         ) : depositItems.length === 0 ? (
           <Text style={styles.emptyText}>No deposits tracked yet — mark an entry as a deposit when adding it.</Text>
         ) : (
-          depositItems.map(renderItemRow)
+          renderItemGrid(depositItems)
         )}
         {items.length > 0 && viewMode === 'all' && <Text style={styles.hint}>Tap an entry with a receipt to view it. Tap Delete (or hold an entry) to remove it.</Text>}
       </ScrollView>
@@ -513,24 +537,22 @@ function createStyles(colors: ThemeColors) {
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
     categoryChip: { backgroundColor: colors.surface2, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
     categoryChipText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 14,
-      marginBottom: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 10,
       elevation: 2,
     },
-    cardMain: { flex: 1, paddingRight: 8 },
     category: { color: colors.text, fontSize: 17, fontFamily: fonts.displaySemiBold },
     description: { color: colors.textDim, fontSize: 15, marginTop: 2, fontFamily: fonts.body },
-    badgeRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+    badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
     badge: {
       color: colors.textFaint,
       fontSize: 12,
@@ -543,7 +565,7 @@ function createStyles(colors: ThemeColors) {
     depositBadge: { color: colors.warn, backgroundColor: colors.warnSoft },
     phaseBadge: { color: colors.spark, backgroundColor: colors.sparkSoft },
     receiptLink: { color: colors.accent, fontSize: 15, marginTop: 4, fontFamily: fonts.bodySemiBold },
-    cardActions: { alignItems: 'flex-end', gap: 6 },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
     amount: { fontSize: 18, fontFamily: fonts.monoMedium },
     deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
     deleteButtonText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bodySemiBold },

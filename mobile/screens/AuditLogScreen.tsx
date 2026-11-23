@@ -4,13 +4,21 @@
  * resource type. Read-only — there's no edit/delete UI for audit log
  * rows on purpose (append-only at the RLS layer too, see 0031).
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. 2-up via chunkPairs; detail/actor text is capped at a
+ * couple of lines per card so one long detail string doesn't blow out
+ * the height of its row's shorter neighbor.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 import { supabase } from '../lib/supabase';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
@@ -137,18 +145,25 @@ export function AuditLogScreen({ route }: Props) {
         {filtered.length === 0 ? (
           <Text style={styles.emptyText}>Nothing logged yet.</Text>
         ) : (
-          filtered.map((entry) => (
-            <View key={entry.id} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.action}>
-                  {ACTION_LABELS[entry.action]} {RESOURCE_TYPE_LABELS[entry.resource_type]}
-                </Text>
-                <Text style={styles.timestamp}>
-                  {new Date(entry.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                </Text>
-              </View>
-              <Text style={styles.actor}>{entry.actor?.display_name ?? 'Unknown'}</Text>
-              {describeDetail(entry) && <Text style={styles.detail}>{describeDetail(entry)}</Text>}
+          chunkPairs(filtered).map((row, i) => (
+            <View key={i} style={styles.row}>
+              {row.map((entry) => (
+                <View key={entry.id} style={styles.card}>
+                  <Text style={styles.action}>
+                    {ACTION_LABELS[entry.action]} {RESOURCE_TYPE_LABELS[entry.resource_type]}
+                  </Text>
+                  <Text style={styles.timestamp}>
+                    {new Date(entry.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <Text style={styles.actor}>{entry.actor?.display_name ?? 'Unknown'}</Text>
+                  {describeDetail(entry) && (
+                    <Text style={styles.detail} numberOfLines={3}>
+                      {describeDetail(entry)}
+                    </Text>
+                  )}
+                </View>
+              ))}
+              {row.length === 1 && <View style={styles.cardSpacer} />}
             </View>
           ))
         )}
@@ -173,20 +188,21 @@ function createStyles(colors: ThemeColors) {
     error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
     emptyContainer: { flexGrow: 1, justifyContent: 'center' },
     emptyText: { color: colors.textFaint, fontSize: 17, textAlign: 'center', fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 14,
-      marginBottom: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 10,
       elevation: 2,
     },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     action: { color: colors.text, fontSize: 17, fontFamily: fonts.bodySemiBold },
-    timestamp: { color: colors.textFaint, fontSize: 14, fontFamily: fonts.mono },
+    timestamp: { color: colors.textFaint, fontSize: 14, fontFamily: fonts.mono, marginTop: 2 },
     actor: { color: colors.textDim, fontSize: 15, marginTop: 4, fontFamily: fonts.body },
     detail: { color: colors.textFaint, fontSize: 15, marginTop: 4, fontFamily: fonts.body },
   });

@@ -8,8 +8,11 @@
  * only a manager-tier person can actually do this, regardless of what
  * this screen shows.
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. Cards render 2-up, same chunkPairs trick as
+ * TourListScreen/DirectoryScreen; each card's own layout went from a
+ * single row (name+meta beside the action button) to stacked, since
+ * that row shape doesn't have room to breathe at half width.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -48,6 +51,12 @@ type Invite = {
   department: string;
   status: string;
 };
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 export function ManageTeamScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
@@ -170,38 +179,47 @@ export function ManageTeamScreen({ route, navigation }: Props) {
 
       <Text style={styles.sectionTitle}>On this tour</Text>
       {members.length === 0 && <Text style={styles.emptyText}>No one on the roster yet.</Text>}
-      {members.map((m) => (
-        <Pressable key={m.user_id} style={styles.card} onLongPress={() => confirmRemoveMember(m)}>
-          <View>
-            <Text style={styles.name}>{m.profile?.display_name ?? 'Unknown'}</Text>
-            <Text style={styles.meta}>
-              {formatRole(m.role)} · {formatDepartment(m.department)}
-            </Text>
-          </View>
-          <Pressable style={styles.deleteButton} onPress={() => confirmRemoveMember(m)}>
-            <Text style={styles.deleteButtonText}>Remove</Text>
-          </Pressable>
-        </Pressable>
+      {chunkPairs(members).map((row, i) => (
+        <View key={i} style={styles.row}>
+          {row.map((m) => (
+            <Pressable key={m.user_id} style={styles.card} onLongPress={() => confirmRemoveMember(m)}>
+              <Text style={styles.name}>{m.profile?.display_name ?? 'Unknown'}</Text>
+              <Text style={styles.meta}>
+                {formatRole(m.role)} · {formatDepartment(m.department)}
+              </Text>
+              <Pressable style={styles.deleteButton} onPress={() => confirmRemoveMember(m)}>
+                <Text style={styles.deleteButtonText}>Remove</Text>
+              </Pressable>
+            </Pressable>
+          ))}
+          {row.length === 1 && <View style={styles.cardSpacer} />}
+        </View>
       ))}
 
       {invites.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Pending invites</Text>
-          {invites.map((inv) => (
-            <Pressable key={inv.id} style={styles.card} onLongPress={() => confirmCancelInvite(inv)}>
-              <View>
-                <Text style={styles.name}>{inv.full_name}</Text>
-                <Text style={styles.meta}>
-                  {inv.email} · {formatRole(inv.role)} · {formatDepartment(inv.department)}
-                </Text>
-              </View>
-              <View style={styles.inviteActions}>
-                <Text style={styles.pendingBadge}>Pending</Text>
-                <Pressable style={styles.deleteButton} onPress={() => confirmCancelInvite(inv)}>
-                  <Text style={styles.deleteButtonText}>Cancel</Text>
+          {chunkPairs(invites).map((row, i) => (
+            <View key={i} style={styles.row}>
+              {row.map((inv) => (
+                <Pressable key={inv.id} style={styles.card} onLongPress={() => confirmCancelInvite(inv)}>
+                  <View style={styles.inviteHeader}>
+                    <Text style={styles.name}>{inv.full_name}</Text>
+                    <Text style={styles.pendingBadge}>Pending</Text>
+                  </View>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {inv.email}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {formatRole(inv.role)} · {formatDepartment(inv.department)}
+                  </Text>
+                  <Pressable style={styles.deleteButton} onPress={() => confirmCancelInvite(inv)}>
+                    <Text style={styles.deleteButtonText}>Cancel</Text>
+                  </Pressable>
                 </Pressable>
-              </View>
-            </Pressable>
+              ))}
+              {row.length === 1 && <View style={styles.cardSpacer} />}
+            </View>
           ))}
         </>
       )}
@@ -223,25 +241,24 @@ function createStyles(colors: ThemeColors) {
     sectionTitle: { color: colors.textDim, fontSize: 15, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
     sectionTitleSpaced: { marginTop: 20 },
     emptyText: { color: colors.textFaint, fontSize: 16, marginBottom: 8, fontFamily: fonts.body },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 14,
-      marginBottom: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 10,
       elevation: 2,
     },
-    name: { color: colors.text, fontSize: 17, fontFamily: fonts.displaySemiBold },
+    name: { color: colors.text, fontSize: 17, fontFamily: fonts.displaySemiBold, flexShrink: 1 },
     meta: { color: colors.textDim, fontSize: 15, marginTop: 2, fontFamily: fonts.body },
-    pendingBadge: { color: colors.warn, fontSize: 14, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase' },
-    inviteActions: { alignItems: 'flex-end', gap: 6 },
-    deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+    inviteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 },
+    pendingBadge: { color: colors.warn, fontSize: 12, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase' },
+    deleteButton: { alignSelf: 'flex-start', backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 8 },
     deleteButtonText: { color: colors.danger, fontSize: 15, fontFamily: fonts.bodySemiBold },
   });
 }

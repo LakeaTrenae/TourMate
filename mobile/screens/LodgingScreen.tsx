@@ -6,8 +6,8 @@
  * query returns only the room(s) they're actually assigned to (see
  * "lodging_rooms readable by assigned occupant" in 0002_policy_gaps.sql).
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. 2-up via chunkPairs.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -44,6 +44,12 @@ type Room = { id: string; lodging_id: string; room_number: string | null; notes:
 type Occupant = { room_id: string; user_id: string; profile: { display_name: string } | null };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 export function LodgingScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
@@ -189,41 +195,50 @@ export function LodgingScreen({ route, navigation }: Props) {
               : "No room assigned to you yet — you'll only see hotels where you have a room."}
           </Text>
         ) : (
-          lodgings.map((lodging) => (
-            <Pressable
-              key={lodging.id}
-              style={styles.card}
-              onLongPress={isManager ? () => confirmDelete(lodging) : undefined}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.hotelName}>{lodging.hotel_name}</Text>
-                {isManager && (
-                  <Pressable style={styles.deleteButton} onPress={() => confirmDelete(lodging)}>
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </Pressable>
-                )}
-              </View>
-              {lodging.address && <Text style={styles.address}>{lodging.address}</Text>}
-              <Text style={styles.dates}>
-                {formatDate(lodging.check_in)} – {formatDate(lodging.check_out)}
-              </Text>
-              {lodging.confirmation_code && (
-                <Text style={styles.confirmation}>Confirmation: {lodging.confirmation_code}</Text>
-              )}
-
-              <View style={styles.rooms}>
-                {(roomsByLodging[lodging.id] ?? []).map((room) => (
-                  <View key={room.id} style={styles.room}>
-                    <Text style={styles.roomNumber}>Room {room.room_number ?? '—'}</Text>
-                    {(occupantsByRoom[room.id] ?? []).map((occ) => (
-                      <Text key={occ.user_id} style={styles.occupant}>
-                        {occ.profile?.display_name ?? 'Unknown'}
-                      </Text>
-                    ))}
+          chunkPairs(lodgings).map((row, i) => (
+            <View key={i} style={styles.row}>
+              {row.map((lodging) => (
+                <Pressable key={lodging.id} style={styles.card} onLongPress={isManager ? () => confirmDelete(lodging) : undefined}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.hotelName} numberOfLines={1}>
+                      {lodging.hotel_name}
+                    </Text>
+                    {isManager && (
+                      <Pressable style={styles.deleteButton} onPress={() => confirmDelete(lodging)}>
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </Pressable>
+                    )}
                   </View>
-                ))}
-              </View>
-            </Pressable>
+                  {lodging.address && (
+                    <Text style={styles.address} numberOfLines={1}>
+                      {lodging.address}
+                    </Text>
+                  )}
+                  <Text style={styles.dates}>
+                    {formatDate(lodging.check_in)} – {formatDate(lodging.check_out)}
+                  </Text>
+                  {lodging.confirmation_code && (
+                    <Text style={styles.confirmation}>Confirmation: {lodging.confirmation_code}</Text>
+                  )}
+
+                  {(roomsByLodging[lodging.id] ?? []).length > 0 && (
+                    <View style={styles.rooms}>
+                      {(roomsByLodging[lodging.id] ?? []).map((room) => (
+                        <View key={room.id} style={styles.room}>
+                          <Text style={styles.roomNumber}>Room {room.room_number ?? '—'}</Text>
+                          {(occupantsByRoom[room.id] ?? []).map((occ) => (
+                            <Text key={occ.user_id} style={styles.occupant} numberOfLines={1}>
+                              {occ.profile?.display_name ?? 'Unknown'}
+                            </Text>
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+              {row.length === 1 && <View style={styles.cardSpacer} />}
+            </View>
           ))
         )}
         {isManager && lodgings.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a hotel) to remove it.</Text>}
@@ -254,9 +269,9 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.text,
-      fontSize: 31,
+      fontSize: 54,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.4,
+      letterSpacing: -1.2,
     },
     subtitle: {
       color: colors.textDim,
@@ -292,11 +307,13 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 20,
       fontFamily: fonts.body,
     },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 14,
       padding: 16,
-      marginBottom: 12,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
@@ -307,8 +324,9 @@ function createStyles(colors: ThemeColors) {
       color: colors.text,
       fontSize: 19,
       fontFamily: fonts.displaySemiBold,
+      flexShrink: 1,
     },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
     deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
     deleteButtonText: { color: colors.danger, fontSize: 15, fontFamily: fonts.bodySemiBold },
     address: {

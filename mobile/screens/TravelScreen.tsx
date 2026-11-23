@@ -9,8 +9,10 @@
  * screen doesn't need an if/else for that, the data just arrives already
  * scoped.
  *
- * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx.
+ * Grid layout + theme (Manrope/JetBrains Mono, Marquee accent) — see
+ * lib/theme.tsx. 2-up via chunkPairs; the departure→arrival route block
+ * went from side-by-side to stacked (with a down arrow) at half width,
+ * same adaptation as GroundTransportScreen's identical route shape.
  */
 import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -50,6 +52,12 @@ type Flight = {
 type PassengerRow = { flight_id: string; user_id: string; seat: string | null; profile: { display_name: string } | null };
 
 const MANAGER_TIERS = new Set(['owner', 'admin', 'manager']);
+
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
 
 export function TravelScreen({ route, navigation }: Props) {
   const { tourId, tourName } = route.params;
@@ -182,51 +190,52 @@ export function TravelScreen({ route, navigation }: Props) {
               : "No flights assigned to you yet — you'll only see flights you're booked on."}
           </Text>
         ) : (
-          sortedFlights.map((flight) => (
-            <Pressable
-              key={flight.id}
-              style={styles.card}
-              onLongPress={isManager ? () => confirmDelete(flight) : undefined}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.airline}>
-                  {flight.airline ?? 'Flight'} {flight.flight_number ?? ''}
-                </Text>
-                <View style={styles.cardHeaderRight}>
+          chunkPairs(sortedFlights).map((row, i) => (
+            <View key={i} style={styles.row}>
+              {row.map((flight) => (
+                <Pressable key={flight.id} style={styles.card} onLongPress={isManager ? () => confirmDelete(flight) : undefined}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.airline} numberOfLines={1}>
+                      {flight.airline ?? 'Flight'} {flight.flight_number ?? ''}
+                    </Text>
+                    {isManager && (
+                      <Pressable style={styles.deleteButton} onPress={() => confirmDelete(flight)}>
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </Pressable>
+                    )}
+                  </View>
                   {(flight.status_detail ?? flight.status) && <Text style={styles.status}>{flight.status_detail ?? flight.status}</Text>}
-                  {isManager && (
-                    <Pressable style={styles.deleteButton} onPress={() => confirmDelete(flight)}>
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </Pressable>
+
+                  <View style={styles.route}>
+                    <View style={styles.leg}>
+                      <Text style={styles.airport}>{flight.departure_airport}</Text>
+                      <Text style={styles.time}>{formatDateTime(flight.departure_time)}</Text>
+                    </View>
+                    <Text style={styles.arrow}>↓</Text>
+                    <View style={styles.leg}>
+                      <Text style={styles.airport}>{flight.arrival_airport}</Text>
+                      <Text style={styles.time}>{formatDateTime(flight.arrival_time)}</Text>
+                    </View>
+                  </View>
+
+                  {flight.confirmation_code && (
+                    <Text style={styles.confirmation}>Confirmation: {flight.confirmation_code}</Text>
                   )}
-                </View>
-              </View>
 
-              <View style={styles.route}>
-                <View style={styles.leg}>
-                  <Text style={styles.airport}>{flight.departure_airport}</Text>
-                  <Text style={styles.time}>{formatDateTime(flight.departure_time)}</Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-                <View style={styles.leg}>
-                  <Text style={styles.airport}>{flight.arrival_airport}</Text>
-                  <Text style={styles.time}>{formatDateTime(flight.arrival_time)}</Text>
-                </View>
-              </View>
-
-              {flight.confirmation_code && (
-                <Text style={styles.confirmation}>Confirmation: {flight.confirmation_code}</Text>
-              )}
-
-              <View style={styles.passengers}>
-                {(passengersByFlight[flight.id] ?? []).map((p) => (
-                  <Text key={p.user_id} style={styles.passenger}>
-                    {p.profile?.display_name ?? 'Unknown'}
-                    {p.seat ? ` · Seat ${p.seat}` : ''}
-                  </Text>
-                ))}
-              </View>
-            </Pressable>
+                  {(passengersByFlight[flight.id] ?? []).length > 0 && (
+                    <View style={styles.passengers}>
+                      {(passengersByFlight[flight.id] ?? []).map((p) => (
+                        <Text key={p.user_id} style={styles.passenger} numberOfLines={1}>
+                          {p.profile?.display_name ?? 'Unknown'}
+                          {p.seat ? ` · Seat ${p.seat}` : ''}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+              {row.length === 1 && <View style={styles.cardSpacer} />}
+            </View>
           ))
         )}
         {isManager && sortedFlights.length > 0 && <Text style={styles.hint}>Tap Delete (or hold a flight) to remove it.</Text>}
@@ -257,9 +266,9 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.text,
-      fontSize: 31,
+      fontSize: 54,
       fontFamily: fonts.displayBlack,
-      letterSpacing: -0.4,
+      letterSpacing: -1.2,
     },
     subtitle: {
       color: colors.textDim,
@@ -304,11 +313,13 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 20,
       fontFamily: fonts.body,
     },
+    row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    cardSpacer: { flex: 1 },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 14,
       padding: 16,
-      marginBottom: 12,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
@@ -319,32 +330,30 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 10,
+      gap: 8,
     },
-    cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
     deleteButtonText: { color: colors.danger, fontSize: 15, fontFamily: fonts.bodySemiBold },
     airline: {
       color: colors.text,
       fontSize: 18,
       fontFamily: fonts.displaySemiBold,
+      flexShrink: 1,
     },
     status: {
       color: colors.warn,
       fontSize: 15,
       fontFamily: fonts.bodySemiBold,
       textTransform: 'uppercase',
+      marginTop: 4,
     },
     route: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      marginTop: 10,
     },
-    leg: {
-      flex: 1,
-    },
+    leg: {},
     airport: {
       color: colors.text,
-      fontSize: 22,
+      fontSize: 20,
       fontFamily: fonts.displayBold,
     },
     time: {
@@ -355,8 +364,8 @@ function createStyles(colors: ThemeColors) {
     },
     arrow: {
       color: colors.textFaint,
-      fontSize: 19,
-      marginHorizontal: 10,
+      fontSize: 16,
+      marginVertical: 4,
     },
     confirmation: {
       color: colors.textFaint,

@@ -112,10 +112,10 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.text,
-      fontSize: 33,
+      fontSize: 36,
       fontFamily: fonts.displayBlack,
       textAlign: 'center',
-      letterSpacing: -0.4,
+      letterSpacing: -1.2,
     },
     subtitle: {
       color: colors.textDim,
