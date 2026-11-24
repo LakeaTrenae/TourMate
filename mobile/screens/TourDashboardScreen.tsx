@@ -14,9 +14,11 @@
  * already does that even if this check were somehow bypassed).
  *
  * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
- * review — see lib/theme.tsx. Section/NavRow are module-level helpers,
- * so they take the computed `styles` as a prop rather than closing over
- * a module-level StyleSheet the way the pre-theme version did.
+ * review — see lib/theme.tsx. Section/NavTileGrid are module-level
+ * helpers, so they take the computed `styles` as a prop rather than
+ * closing over a module-level StyleSheet the way the pre-theme version
+ * did. "More" renders as a 3-up tile grid rather than a tappable list —
+ * this is the one screen that fans out to a dozen-plus destinations.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -443,22 +445,57 @@ export function TourDashboardScreen({ route, navigation }: Props) {
       </Section>
 
       <Section title="More" styles={styles}>
-        <NavRow styles={styles} label="Directory" onPress={() => navigation.navigate('Directory', { tourId, tourName })} />
-        <NavRow styles={styles} label="Artists" onPress={() => navigation.navigate('Artists', { tourId, tourName })} />
-        <NavRow styles={styles} label="Travel" onPress={() => navigation.navigate('Travel', { tourId, tourName })} />
-        <NavRow styles={styles} label="Ground Transport" onPress={() => navigation.navigate('GroundTransport', { tourId, tourName })} />
-        <NavRow styles={styles} label="Route" onPress={() => navigation.navigate('Route', { tourId, tourName })} />
-        <NavRow styles={styles} label="Lodging" onPress={() => navigation.navigate('Lodging', { tourId, tourName })} />
-        <NavRow styles={styles} label="Guest List" onPress={() => navigation.navigate('GuestList', { tourId, tourName })} />
-        <NavRow styles={styles} label="Documents" onPress={() => navigation.navigate('Documents', { tourId, tourName })} />
-        <NavRow styles={styles} label="Checklists" onPress={() => navigation.navigate('Checklists', { tourId, tourName })} />
-        <NavRow styles={styles} label="Set Lists" onPress={() => navigation.navigate('SetLists', { tourId, tourName })} />
-        <NavRow styles={styles} label="Full Tour Export" onPress={() => navigation.navigate('TourExport', { tourId, tourName })} />
-        <NavRow styles={styles} label="Import Data" onPress={() => navigation.navigate('Import', { tourId, tourName })} />
-        {isManager && <NavRow styles={styles} label="Budget" onPress={() => navigation.navigate('Budget', { tourId, tourName })} />}
-        {isManager && <NavRow styles={styles} label="Activity Log" onPress={() => navigation.navigate('AuditLog', { tourId, tourName })} />}
+        <NavTileGrid
+          styles={styles}
+          tiles={[
+            { label: 'Directory', onPress: () => navigation.navigate('Directory', { tourId, tourName }) },
+            { label: 'Artists', onPress: () => navigation.navigate('Artists', { tourId, tourName }) },
+            { label: 'Travel', onPress: () => navigation.navigate('Travel', { tourId, tourName }) },
+            { label: 'Ground Transport', onPress: () => navigation.navigate('GroundTransport', { tourId, tourName }) },
+            { label: 'Route', onPress: () => navigation.navigate('Route', { tourId, tourName }) },
+            { label: 'Lodging', onPress: () => navigation.navigate('Lodging', { tourId, tourName }) },
+            { label: 'Guest List', onPress: () => navigation.navigate('GuestList', { tourId, tourName }) },
+            { label: 'Documents', onPress: () => navigation.navigate('Documents', { tourId, tourName }) },
+            { label: 'Checklists', onPress: () => navigation.navigate('Checklists', { tourId, tourName }) },
+            { label: 'Set Lists', onPress: () => navigation.navigate('SetLists', { tourId, tourName }) },
+            { label: 'Full Tour Export', onPress: () => navigation.navigate('TourExport', { tourId, tourName }) },
+            { label: 'Import Data', onPress: () => navigation.navigate('Import', { tourId, tourName }) },
+            ...(isManager ? [{ label: 'Budget', onPress: () => navigation.navigate('Budget', { tourId, tourName }) }] : []),
+            ...(isManager ? [{ label: 'Activity Log', onPress: () => navigation.navigate('AuditLog', { tourId, tourName }) }] : []),
+          ]}
+        />
       </Section>
     </ScrollView>
+  );
+}
+
+function chunkInto<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
+// Tiles, not a plain tappable list — this is the one place in the app
+// where a single screen fans out to a dozen-plus destinations, so it
+// reads as a feature menu rather than another record list. No icon set
+// (this app has none anywhere else), so the tile itself — bold label,
+// an amber top accent bar, generous tap target — carries the "cool"
+// instead of borrowed iconography.
+function NavTileGrid({ tiles, styles }: { tiles: { label: string; onPress: () => void }[]; styles: Styles }) {
+  return (
+    <View style={styles.tileGrid}>
+      {chunkInto(tiles, 3).map((row, i) => (
+        <View key={i} style={styles.tileRow}>
+          {row.map((tile) => (
+            <Pressable key={tile.label} style={styles.tile} onPress={tile.onPress}>
+              <View style={styles.tileAccent} />
+              <Text style={styles.tileLabel}>{tile.label}</Text>
+            </Pressable>
+          ))}
+          {row.length < 3 && <View style={{ flex: 3 - row.length }} />}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -484,14 +521,6 @@ function Section({
   );
 }
 
-function NavRow({ label, onPress, styles }: { label: string; onPress: () => void; styles: Styles }) {
-  return (
-    <Pressable style={styles.stubRow} onPress={onPress}>
-      <Text style={styles.stubLabel}>{label}</Text>
-      <Text style={styles.navArrow}>›</Text>
-    </Pressable>
-  );
-}
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
@@ -697,22 +726,31 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.bodySemiBold,
       marginTop: 6,
     },
-    stubRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+    tileGrid: {},
+    tileRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+    tile: {
+      flex: 1,
       backgroundColor: colors.surface,
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 6,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 14,
+      minHeight: 76,
+      justifyContent: 'flex-end',
+      overflow: 'hidden',
     },
-    stubLabel: {
+    tileAccent: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      backgroundColor: colors.accent,
+    },
+    tileLabel: {
       color: colors.text,
-      fontSize: 17,
-      fontFamily: fonts.body,
-    },
-    navArrow: {
-      color: colors.textFaint,
-      fontSize: 22,
+      fontSize: 15,
+      fontFamily: fonts.displaySemiBold,
+      lineHeight: 18,
     },
   });
 }
