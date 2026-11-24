@@ -10,7 +10,12 @@
  * Adding someone to the team picks from the tour's existing roster
  * (fetchTourRoster) — this doesn't create new accounts, it just marks an
  * existing tour member as "on Artist X's team," which is what flips
- * their visibility into this artist's private data.
+ * their visibility into this artist's private data. Team members get an
+ * optional job title (role, free text — "FOH Engineer") and department
+ * (the same tour_department enum the tour-wide roster groups by,
+ * 0048_artist_team_department.sql) so an artist's own production/
+ * security/etc. crew renders as its own grouped section, same pattern
+ * as DirectoryScreen.
  *
  * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
  * review — see lib/theme.tsx.
@@ -38,13 +43,19 @@ import { newId } from '../lib/ids';
 import { logAuditEvent } from '../lib/auditLog';
 import { notify } from '../lib/notify';
 import { formatDateOnly } from '../lib/dates';
+import { formatDepartment } from '../lib/format';
 import { useTheme, fonts, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArtistDetail'>;
 
 type Contact = { id: string; name: string; role: string | null; phone: string | null; email: string | null };
-type TeamMember = { id: string; user_id: string; role: string | null; profile: { display_name: string } | null };
+type TeamMember = { id: string; user_id: string; role: string | null; department: string | null; profile: { display_name: string } | null };
+
+// Matches the tour_department enum (0003, extended with 'security' in
+// 0021) — same list AddDocumentScreen already uses for its own
+// department picker.
+const DEPARTMENTS = ['production', 'security', 'travel', 'artist_relations', 'finance', 'tour_management', 'general'];
 type Doc = { id: string; title: string; category: string; created_at: string };
 type DressingRoom = { id: string; room_name: string; notes: string | null; tour_date: { date: string } | null };
 
@@ -68,6 +79,9 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [showAddTeam, setShowAddTeam] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingRole, setPendingRole] = useState('');
+  const [pendingDepartment, setPendingDepartment] = useState<string | null>(null);
   const [savingContact, setSavingContact] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,7 +102,10 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       // added_by) — PostgREST can't auto-pick which one to embed for
       // "profile" without disambiguation, so this names the column
       // explicitly rather than just `profiles(display_name)`.
-      supabase.from('artist_team_members').select('id, user_id, role, profile:profiles!artist_team_members_user_id_fkey(display_name)').eq('artist_id', artistId),
+      supabase
+        .from('artist_team_members')
+        .select('id, user_id, role, department, profile:profiles!artist_team_members_user_id_fkey(display_name)')
+        .eq('artist_id', artistId),
       supabase.from('documents').select('id, title, category, created_at').eq('artist_id', artistId).order('created_at', { ascending: false }),
       // Read-only here — assignment itself is inherently date-scoped and
       // stays on ShowDetailScreen; this just answers "where is this
@@ -196,11 +213,16 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       id: newId(),
       artist_id: artistId,
       user_id: userId,
+      role: pendingRole.trim() || null,
+      department: pendingDepartment,
     });
     if (error) {
       setErrorMessage(error.message.includes('duplicate') ? 'Already on this team.' : error.message);
       return;
     }
+    setPendingUserId(null);
+    setPendingRole('');
+    setPendingDepartment(null);
     notify({
       tourId,
       targetUserIds: [userId],
@@ -297,18 +319,58 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
       <View style={[styles.sectionHeader, styles.sectionSpaced]}>
         <Text style={styles.sectionTitle}>Team</Text>
         {canManage && (
-          <Pressable onPress={() => setShowAddTeam((v) => !v)}>
+          <Pressable
+            onPress={() => {
+              setShowAddTeam((v) => !v);
+              setPendingUserId(null);
+              setPendingRole('');
+              setPendingDepartment(null);
+            }}
+          >
             <Text style={styles.sectionAction}>{showAddTeam ? 'Cancel' : '+ Add'}</Text>
           </Pressable>
         )}
       </View>
       {showAddTeam && (
         <View style={styles.addCard}>
-          {availableRoster.length === 0 ? (
+          {pendingUserId ? (
+            <>
+              <Text style={styles.pendingName}>
+                {availableRoster.find((r) => r.user_id === pendingUserId)?.display_name ?? 'Selected person'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Role — e.g. FOH Engineer, Tour Manager (optional)"
+                placeholderTextColor={colors.textFaint}
+                value={pendingRole}
+                onChangeText={setPendingRole}
+              />
+              <Text style={styles.inputLabel}>Department (optional)</Text>
+              <View style={styles.chipRow}>
+                {DEPARTMENTS.map((d) => (
+                  <Pressable
+                    key={d}
+                    style={[styles.chip, pendingDepartment === d && styles.chipActive]}
+                    onPress={() => setPendingDepartment(pendingDepartment === d ? null : d)}
+                  >
+                    <Text style={[styles.chipText, pendingDepartment === d && styles.chipTextActive]}>{formatDepartment(d)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.pendingActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => setPendingUserId(null)}>
+                  <Text style={styles.secondaryButtonText}>Back</Text>
+                </Pressable>
+                <Pressable style={[styles.saveButton, styles.pendingSaveButton]} onPress={() => handleAddTeamMember(pendingUserId)}>
+                  <Text style={styles.saveButtonText}>Add to Team</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : availableRoster.length === 0 ? (
             <Text style={styles.emptyText}>Everyone on the roster is already on a team, or there's no one to add yet.</Text>
           ) : (
             availableRoster.map((r) => (
-              <Pressable key={r.user_id} style={styles.rosterRow} onPress={() => handleAddTeamMember(r.user_id)}>
+              <Pressable key={r.user_id} style={styles.rosterRow} onPress={() => setPendingUserId(r.user_id)}>
                 <Text style={styles.rosterName}>{r.display_name}</Text>
                 <Text style={styles.rosterAdd}>+ Add</Text>
               </Pressable>
@@ -317,18 +379,25 @@ export function ArtistDetailScreen({ route, navigation }: Props) {
         </View>
       )}
       {team.length === 0 && !showAddTeam && <Text style={styles.emptyText}>No one assigned yet.</Text>}
-      {team.map((m) => (
-        <Pressable key={m.id} style={[styles.card, styles.cardRow]} onLongPress={canManage ? () => confirmRemoveTeamMember(m) : undefined}>
-          <View style={styles.cardMain}>
-            <Text style={styles.contactName}>{m.profile?.display_name ?? 'Unknown'}</Text>
-            {m.role && <Text style={styles.contactRole}>{m.role}</Text>}
-          </View>
-          {canManage && (
-            <Pressable style={styles.deleteButton} onPress={() => confirmRemoveTeamMember(m)}>
-              <Text style={styles.deleteButtonText}>Remove</Text>
-            </Pressable>
-          )}
-        </Pressable>
+      {DEPARTMENTS.filter((d) => team.some((m) => (m.department ?? 'general') === d)).map((dept) => (
+        <View key={dept} style={styles.teamGroup}>
+          <Text style={styles.teamGroupTitle}>{formatDepartment(dept)}</Text>
+          {team
+            .filter((m) => (m.department ?? 'general') === dept)
+            .map((m) => (
+              <Pressable key={m.id} style={[styles.card, styles.cardRow]} onLongPress={canManage ? () => confirmRemoveTeamMember(m) : undefined}>
+                <View style={styles.cardMain}>
+                  <Text style={styles.contactName}>{m.profile?.display_name ?? 'Unknown'}</Text>
+                  {m.role && <Text style={styles.contactRole}>{m.role}</Text>}
+                </View>
+                {canManage && (
+                  <Pressable style={styles.deleteButton} onPress={() => confirmRemoveTeamMember(m)}>
+                    <Text style={styles.deleteButtonText}>Remove</Text>
+                  </Pressable>
+                )}
+              </Pressable>
+            ))}
+        </View>
       ))}
       {canManage && team.length > 0 && <Text style={styles.hint}>Tap Remove (or hold a name) to remove them from this team.</Text>}
 
@@ -397,6 +466,19 @@ function createStyles(colors: ThemeColors) {
     rowInput: { flex: 1 },
     saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
     saveButtonText: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.bodySemiBold },
+    pendingName: { color: colors.text, fontSize: 18, fontFamily: fonts.displaySemiBold, marginBottom: 10 },
+    inputLabel: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    chip: { backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: colors.border },
+    chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+    chipText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    chipTextActive: { color: colors.onAccent },
+    pendingActions: { flexDirection: 'row', gap: 8 },
+    pendingSaveButton: { flex: 1, marginTop: 0 },
+    secondaryButton: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+    secondaryButtonText: { color: colors.textDim, fontSize: 17, fontFamily: fonts.bodySemiBold },
+    teamGroup: { marginBottom: 4 },
+    teamGroupTitle: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 4 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: 10,
