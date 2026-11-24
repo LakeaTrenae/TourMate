@@ -86,6 +86,11 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   const [newRoomName, setNewRoomName] = useState('');
   const [addingRoom, setAddingRoom] = useState(false);
   const [assigningRoomId, setAssigningRoomId] = useState<string | null>(null);
+  const [editingPromoter, setEditingPromoter] = useState(false);
+  const [promoterNameInput, setPromoterNameInput] = useState('');
+  const [promoterPhoneInput, setPromoterPhoneInput] = useState('');
+  const [promoterEmailInput, setPromoterEmailInput] = useState('');
+  const [savingPromoter, setSavingPromoter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -191,6 +196,37 @@ export function ShowDetailScreen({ route, navigation }: Props) {
       setErrorMessage(error.message);
       return;
     }
+    await load();
+  }
+
+  // Promoter contact is settable at creation (AddTourDateScreen) but had
+  // no way to be added or corrected afterward — this is the only edit
+  // path for it, scoped to manager-tier since it's deal-adjacent info,
+  // same gate as the Deal section below it.
+  function startEditPromoter() {
+    setPromoterNameInput(show?.promoter_name ?? '');
+    setPromoterPhoneInput(show?.promoter_phone ?? '');
+    setPromoterEmailInput(show?.promoter_email ?? '');
+    setEditingPromoter(true);
+  }
+
+  async function handleSavePromoter() {
+    setSavingPromoter(true);
+    setErrorMessage(null);
+    const { error } = await supabase
+      .from('tour_dates')
+      .update({
+        promoter_name: promoterNameInput.trim() || null,
+        promoter_phone: promoterPhoneInput.trim() || null,
+        promoter_email: promoterEmailInput.trim() || null,
+      })
+      .eq('id', tourDateId);
+    setSavingPromoter(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setEditingPromoter(false);
     await load();
   }
 
@@ -370,12 +406,60 @@ export function ShowDetailScreen({ route, navigation }: Props) {
         <TimeRow styles={styles} label="Set time" value={show.set_time} />
       </View>
 
-      {(show.promoter_name || show.promoter_phone || show.promoter_email) && (
+      {(show.promoter_name || show.promoter_phone || show.promoter_email || isManager) && (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Promoter</Text>
-          {show.promoter_name && <Text style={styles.detailText}>{show.promoter_name}</Text>}
-          {show.promoter_phone && <Text style={styles.detailText}>{show.promoter_phone}</Text>}
-          {show.promoter_email && <Text style={styles.detailText}>{show.promoter_email}</Text>}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Promoter</Text>
+            {isManager && !editingPromoter && (
+              <Pressable onPress={startEditPromoter}>
+                <Text style={styles.sectionAction}>{show.promoter_name || show.promoter_phone || show.promoter_email ? 'Edit' : '+ Add'}</Text>
+              </Pressable>
+            )}
+          </View>
+          {editingPromoter ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Promoter name"
+                placeholderTextColor={colors.textFaint}
+                value={promoterNameInput}
+                onChangeText={setPromoterNameInput}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone"
+                placeholderTextColor={colors.textFaint}
+                value={promoterPhoneInput}
+                onChangeText={setPromoterPhoneInput}
+                keyboardType="phone-pad"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={colors.textFaint}
+                value={promoterEmailInput}
+                onChangeText={setPromoterEmailInput}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <View style={styles.promoterActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => setEditingPromoter(false)}>
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.saveButton, styles.promoterSaveButton]} onPress={handleSavePromoter} disabled={savingPromoter}>
+                  {savingPromoter ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveButtonText}>Save</Text>}
+                </Pressable>
+              </View>
+            </>
+          ) : show.promoter_name || show.promoter_phone || show.promoter_email ? (
+            <>
+              {show.promoter_name && <Text style={styles.detailText}>{show.promoter_name}</Text>}
+              {show.promoter_phone && <Text style={styles.detailText}>{show.promoter_phone}</Text>}
+              {show.promoter_email && <Text style={styles.detailText}>{show.promoter_email}</Text>}
+            </>
+          ) : (
+            <Text style={styles.emptyText}>No promoter contact on file yet.</Text>
+          )}
         </View>
       )}
 
@@ -461,6 +545,24 @@ function createStyles(colors: ThemeColors) {
     deleteButton: { backgroundColor: colors.dangerSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
     deleteButtonText: { color: colors.danger, fontSize: 15, fontFamily: fonts.bodySemiBold },
     privacyNote: { color: colors.textFaint, fontSize: 14, marginBottom: 10, fontStyle: 'italic', fontFamily: fonts.body },
+    input: {
+      backgroundColor: colors.bg,
+      color: colors.text,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 8,
+      fontSize: 17,
+      fontFamily: fonts.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    promoterActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    saveButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+    saveButtonText: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.bodySemiBold },
+    promoterSaveButton: { flex: 1 },
+    secondaryButton: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+    secondaryButtonText: { color: colors.textDim, fontSize: 17, fontFamily: fonts.bodySemiBold },
     addRoomRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
     addRoomInput: {
       flex: 1,
