@@ -6,6 +6,11 @@
  * the ~16-day forecast horizon), and links out to that date's Advance
  * sheet and (manager-only) Settlement.
  *
+ * Prev/Next Day paging (dayNavRow) lets someone browse the whole tour
+ * date by date without backing out to the schedule list each time —
+ * `navigation.replace`, not `navigate`, so the back stack doesn't grow
+ * by one entry per day visited.
+ *
  * Theme (Manrope/JetBrains Mono, navy accent) per the "Load-In" design
  * review — see lib/theme.tsx. TimeRow is a module-level helper, so it
  * takes the computed `styles` as a prop rather than closing over a
@@ -91,10 +96,17 @@ export function ShowDetailScreen({ route, navigation }: Props) {
   const [promoterPhoneInput, setPromoterPhoneInput] = useState('');
   const [promoterEmailInput, setPromoterEmailInput] = useState('');
   const [savingPromoter, setSavingPromoter] = useState(false);
+  const [tourDates, setTourDates] = useState<{ id: string; date: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function load() {
+    // Every date on the tour, in order — lets the day-by-day Prev/Next
+    // controls below know this show's position without a separate
+    // screen; cheap even for a long tour (id + date only, no joins).
+    const { data: dateRows } = await supabase.from('tour_dates').select('id, date').eq('tour_id', tourId).order('date', { ascending: true });
+    setTourDates(dateRows ?? []);
+
     if (session) {
       const [{ data: roleData }, { data: deptData }] = await Promise.all([
         supabase.rpc('effective_tour_role', { p_tour_id: tourId, p_user_id: session.user.id }),
@@ -293,9 +305,40 @@ export function ShowDetailScreen({ route, navigation }: Props) {
       ? `${approvedGuestCount} / ${capacity} approved — ${approvedGuestCount >= capacity ? 'at or over capacity' : 'approaching capacity'}`
       : null;
 
+  // Day-by-day paging — go straight to the previous/next show date's full
+  // detail (venue, schedule, promoter, everything) without backing out to
+  // the tour's schedule list and tapping another date. `replace` (not
+  // `navigate`) so browsing from day 1 to day 5 doesn't stack five Back
+  // presses — Back always returns to wherever you actually came from.
+  const dayIndex = tourDates.findIndex((d) => d.id === tourDateId);
+  const prevDate = dayIndex > 0 ? tourDates[dayIndex - 1] : null;
+  const nextDate = dayIndex >= 0 && dayIndex < tourDates.length - 1 ? tourDates[dayIndex + 1] : null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+
+      {tourDates.length > 1 && (
+        <View style={styles.dayNavRow}>
+          <Pressable
+            style={[styles.dayNavButton, !prevDate && styles.dayNavButtonDisabled]}
+            onPress={() => prevDate && navigation.replace('ShowDetail', { tourId, tourDateId: prevDate.id })}
+            disabled={!prevDate}
+          >
+            <Text style={[styles.dayNavButtonText, !prevDate && styles.dayNavButtonTextDisabled]}>‹ Prev Day</Text>
+          </Pressable>
+          <Text style={styles.dayNavCounter}>
+            Day {dayIndex + 1} of {tourDates.length}
+          </Text>
+          <Pressable
+            style={[styles.dayNavButton, !nextDate && styles.dayNavButtonDisabled]}
+            onPress={() => nextDate && navigation.replace('ShowDetail', { tourId, tourDateId: nextDate.id })}
+            disabled={!nextDate}
+          >
+            <Text style={[styles.dayNavButtonText, !nextDate && styles.dayNavButtonTextDisabled]}>Next Day ›</Text>
+          </Pressable>
+        </View>
+      )}
 
       <Text style={styles.dateLabel}>{dateLabel}</Text>
       <View style={styles.statusRow}>
@@ -516,6 +559,22 @@ function createStyles(colors: ThemeColors) {
     centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingBottom: 60 },
     error: { color: colors.danger, fontSize: 16, marginBottom: 12, fontFamily: fonts.body },
+    dayNavRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    dayNavButton: {
+      backgroundColor: colors.accentSoft,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    dayNavButtonDisabled: { backgroundColor: colors.surface2 },
+    dayNavButtonText: { color: colors.accent, fontSize: 14, fontFamily: fonts.bodySemiBold },
+    dayNavButtonTextDisabled: { color: colors.textFaint },
+    dayNavCounter: { color: colors.textFaint, fontSize: 13, fontFamily: fonts.mono },
     dateLabel: { color: colors.text, fontSize: 36, fontFamily: fonts.displayBlack },
     statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 16 },
     statusBadge: { fontSize: 15, fontFamily: fonts.bodyBold, letterSpacing: 0.5 },
