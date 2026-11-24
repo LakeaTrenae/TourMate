@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
   Pressable,
@@ -114,6 +115,31 @@ export function AddDocumentScreen({ route, navigation }: Props) {
     setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? null });
     setSuggestionHint(null);
     if (!title.trim()) setTitle(asset.name.replace(/\.[^/.]+$/, '')); // default title from filename, sans extension
+  }
+
+  // A photo (rider page, handwritten note, a poster) becomes a document
+  // the exact same way a picked file does — same PickedFile shape, same
+  // upload path below — this just adds the camera/photo-library source
+  // DocumentPicker's Files browser doesn't give a clean way to reach.
+  async function handlePickPhoto(source: 'camera' | 'library') {
+    const permission =
+      source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setErrorMessage(source === 'camera' ? 'Camera access is needed to take a photo.' : 'Photo library access is needed to pick a photo.');
+      return;
+    }
+
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (result.canceled || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    const name = asset.fileName ?? `photo-${Date.now()}.jpg`;
+    setFile({ uri: asset.uri, name, mimeType: asset.mimeType ?? 'image/jpeg' });
+    setSuggestionHint(null);
+    if (!title.trim()) setTitle(name.replace(/\.[^/.]+$/, ''));
   }
 
   // "AI drafts, human confirms" — every field this pre-fills stays in the
@@ -278,6 +304,14 @@ export function AddDocumentScreen({ route, navigation }: Props) {
       <Pressable style={styles.filePicker} onPress={handlePickFile}>
         <Text style={styles.filePickerText}>{file ? file.name : 'Choose a file…'}</Text>
       </Pressable>
+      <View style={styles.photoButtonRow}>
+        <Pressable style={styles.photoButton} onPress={() => handlePickPhoto('camera')}>
+          <Text style={styles.photoButtonText}>📷 Take Photo</Text>
+        </Pressable>
+        <Pressable style={styles.photoButton} onPress={() => handlePickPhoto('library')}>
+          <Text style={styles.photoButtonText}>Choose Photo</Text>
+        </Pressable>
+      </View>
 
       {file && (
         <Pressable style={styles.suggestButton} onPress={handleSuggestDetails} disabled={extracting}>
@@ -397,9 +431,18 @@ function createStyles(colors: ThemeColors) {
       borderStyle: 'dashed',
       paddingVertical: 16,
       paddingHorizontal: 14,
-      marginBottom: 10,
+      marginBottom: 8,
       alignItems: 'center',
     },
+    photoButtonRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+    photoButton: {
+      flex: 1,
+      backgroundColor: colors.surface2,
+      borderRadius: 10,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    photoButtonText: { color: colors.textDim, fontSize: 14, fontFamily: fonts.bodySemiBold },
     filePickerText: { color: colors.textDim, fontSize: 17, fontFamily: fonts.body },
     suggestButton: {
       backgroundColor: colors.surface,
